@@ -48,6 +48,8 @@ input:focus{border-color:var(--brand)}
 .msg.err{background:var(--bad-soft);color:#b3262b}
 .msg.info{background:var(--brand-soft);color:#c2334f}
 .demo{background:#fff8e6;color:#8a5a00;font-size:13px;font-weight:600;padding:9px 12px;border-radius:12px;margin-bottom:10px}
+.qrbox{margin-top:14px;padding-top:14px;border-top:1px dashed var(--line);display:flex;flex-direction:column;align-items:center;gap:8px}
+.qrbox #qr img,.qrbox #qr canvas{display:block}
 .bigcode{font-size:56px;font-weight:800;letter-spacing:.18em;color:var(--brand);text-align:center;line-height:1.1}
 .plist{display:grid;gap:8px;margin-top:8px}
 .pl{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;background:var(--soft);font-weight:700}
@@ -113,6 +115,7 @@ input:focus{border-color:var(--brand)}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 /* =========================================================
    ★ Firebase 설정 — 여기만 바꾸면 됩니다 ★
@@ -430,12 +433,14 @@ function roomView(code){
     const ps = players().filter(p => p.online !== false);
     const vc = Object.keys(V.raw).length;
     paint(`${header('<button class="link" id="out">나가기</button>')}
-      <div class="card" style="text-align:center"><p class="sub">방 번호 · 가족에게 알려주세요</p><div class="bigcode">${esc(code)}</div></div>
+      <div class="card" style="text-align:center"><p class="sub">방 번호 · 가족에게 알려주세요</p><div class="bigcode">${esc(code)}</div>
+        <div class="qrbox"><div id="qr"></div><p class="sub">처음 하는 사람은 QR을 찍어 게임을 열고<br>방 번호 <b>${esc(code)}</b>을 입력하세요</p></div></div>
       <div class="card"><h2>들어온 사람 · ${ps.length}명</h2>
         <div class="plist">${ps.map(p=>`<div class="pl" style="--c:${p.color}"><span class="dot"></span>${esc(p.name)} ${p.pid===ME.pid?'<span class="me">(나)</span>':''}</div>`).join('')}</div>
         <div style="height:14px"></div><button class="btn" id="go">시작! (30초)</button>
         <p class="sub" style="text-align:center;margin-top:10px">모두 들어오면 아무나 시작을 누르세요</p></div>
       <div style="text-align:center;margin-top:16px"><button class="link" id="voice">🎤 놀리는 목소리 ${vc}개 · 녹음하러 가기</button></div>`);
+    if (window.QRCode) new QRCode($('#qr'), { text: location.origin + location.pathname, width:150, height:150 });
     $('#go').onclick = startRound;
     $('#out').onclick = leave;
     $('#voice').onclick = () => location.hash = 'v&r='+code;
