@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>뿅뿅 두더지</title>
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-title" content="뿅뿅 두더지">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+:root{
+  --bg:#ffffff; --soft:#f5f7fb; --line:#e6e9f0; --text:#1d2433; --sub:#6b7487;
+  --brand:#ff5c7a; --brand-soft:#ffeef1; --ok:#16a36a; --bad:#e5484d; --bad-soft:#fdecec;
+  --ground:#eaf7e2; --ground2:#d9efcd;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{background:var(--bg);color:var(--text);overscroll-behavior:none}
+body{font-family:Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  -webkit-font-smoothing:antialiased;line-height:1.5;min-height:100vh;-webkit-user-select:none;user-select:none}
+#app{max-width:640px;margin:0 auto;padding:16px 16px 40px}
+h1{font-size:26px;font-weight:800;letter-spacing:-.02em}
+h2{font-size:18px;font-weight:700;margin-bottom:10px}
+p.sub{color:var(--sub);font-size:14px}
+.card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:18px;margin-top:14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:16px;
+  padding:15px 18px;font:inherit;font-weight:800;font-size:17px;cursor:pointer;background:var(--brand);color:#fff;width:100%;touch-action:manipulation}
+.btn:active{transform:scale(.97)}
+.btn.ghost{background:var(--soft);color:var(--text)}
+.btn.small{width:auto;padding:10px 14px;font-size:14px;border-radius:12px}
+.btn[disabled]{opacity:.45}
+.row{display:flex;gap:8px;align-items:center}
+.row>*{flex:1}
+label.f{display:block;font-size:13px;font-weight:700;color:var(--sub);margin:14px 0 6px}
+input{width:100%;font:inherit;font-size:17px;border:1.5px solid var(--line);border-radius:14px;padding:13px 14px;background:#fff;color:var(--text);outline:none;-webkit-user-select:text;user-select:text}
+input:focus{border-color:var(--brand)}
+.code-in{font-size:28px;font-weight:800;text-align:center;letter-spacing:.3em}
+.top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+.brand{display:flex;align-items:center;gap:6px;font-weight:800;font-size:17px}
+.brand svg{width:30px;height:30px}
+.link{background:none;border:0;color:var(--sub);font:inherit;font-size:14px;text-decoration:underline;cursor:pointer}
+.hero{text-align:center;padding:10px 0 2px}
+.hero svg{width:170px;height:auto}
+.colors{display:flex;gap:10px;flex-wrap:wrap}
+.colors button{width:38px;height:38px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 2px var(--line);cursor:pointer}
+.colors button.on{box-shadow:0 0 0 3px var(--text)}
+.msg{margin-top:12px;padding:12px 14px;border-radius:12px;font-size:14px;font-weight:600}
+.msg.err{background:var(--bad-soft);color:#b3262b}
+.msg.info{background:var(--brand-soft);color:#c2334f}
+.demo{background:#fff8e6;color:#8a5a00;font-size:13px;font-weight:600;padding:9px 12px;border-radius:12px;margin-bottom:10px}
+.bigcode{font-size:56px;font-weight:800;letter-spacing:.18em;color:var(--brand);text-align:center;line-height:1.1}
+.plist{display:grid;gap:8px;margin-top:8px}
+.pl{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;background:var(--soft);font-weight:700}
+.dot{width:16px;height:16px;border-radius:50%;background:var(--c);flex:none}
+.me{font-size:12px;color:var(--sub);font-weight:600}
+
+/* ---- 게임 ---- */
+.hud{display:flex;align-items:center;gap:10px}
+.timebar{flex:1;height:12px;background:var(--soft);border-radius:10px;overflow:hidden}
+.timebar i{display:block;height:100%;background:linear-gradient(90deg,#ffb020,#ff5c7a);border-radius:10px}
+.secs{font-weight:800;font-size:20px;min-width:44px;text-align:right;font-variant-numeric:tabular-nums}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:var(--soft);font-weight:700;font-size:14px}
+.chip.mine{background:#fff;box-shadow:0 0 0 2px var(--c)}
+.chip b{font-size:16px;font-variant-numeric:tabular-nums}
+.board{background:var(--ground);border-radius:28px;padding:4% 4% 2%;width:min(100%,64vh,600px);margin:6px auto 0;position:relative;touch-action:none}
+.board.shake{animation:shake .4s}
+@keyframes shake{20%{transform:translate(-8px,3px)}40%{transform:translate(7px,-4px)}60%{transform:translate(-5px,2px)}80%{transform:translate(4px,-1px)}}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3% 4%}
+.hole{position:relative;aspect-ratio:1/1;cursor:pointer}
+.pit{position:absolute;left:6%;right:6%;bottom:6%;height:30%;background:radial-gradient(ellipse at 50% 40%,#2e211b,#4e372c);border-radius:50%}
+.win{position:absolute;left:12%;right:12%;top:0;bottom:21%;overflow:hidden}
+.mole{position:absolute;left:0;right:0;bottom:0;height:100%;transform:translateY(105%);transition:transform .11s ease-out}
+.mole svg{width:100%;height:100%;display:block}
+.up .mole{transform:translateY(6%)}
+.hit .mole{transform:translateY(40%);transition:transform .22s ease-in}
+.f-hit{display:none}
+.hit .f-ok{display:none}.hit .f-hit{display:inline}
+.lip{position:absolute;left:6%;right:6%;bottom:6%;height:15%;background:#7a5644;border-radius:0 0 50% 50%/0 0 100% 100%}
+.lip::after{content:"";position:absolute;left:8%;right:8%;bottom:-18%;height:40%;background:var(--ground2);border-radius:50%;z-index:-1}
+.float{position:absolute;left:50%;top:18%;transform:translateX(-50%);font-weight:800;font-size:clamp(18px,5vw,30px);pointer-events:none;animation:up .7s ease-out forwards;white-space:nowrap;text-shadow:0 2px 0 #fff}
+@keyframes up{to{transform:translate(-50%,-70%);opacity:0}}
+.boom{position:absolute;left:50%;top:45%;width:10%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);background:radial-gradient(#fff3b0,#ffb020 45%,#ff5c3a 70%,transparent 72%);animation:boom .45s ease-out forwards;pointer-events:none}
+@keyframes boom{to{width:130%;opacity:0}}
+.hammer{position:fixed;width:clamp(70px,16vw,120px);pointer-events:none;z-index:50;transform-origin:50% 95%;animation:bonk .22s ease-out forwards}
+@keyframes bonk{0%{transform:translate(-30%,-90%) rotate(-55deg)}45%{transform:translate(-30%,-90%) rotate(18deg)}100%{transform:translate(-30%,-90%) rotate(10deg);opacity:0}}
+.overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.72);z-index:40;pointer-events:none}
+.overlay span{font-size:120px;font-weight:900;color:var(--brand);text-shadow:0 6px 0 #ffd1da}
+.overlay.hide{display:none}
+
+/* ---- 결과 ---- */
+.podium{display:flex;align-items:flex-end;justify-content:center;gap:10px;margin-top:20px}
+.pod{flex:1;max-width:150px;text-align:center}
+.pod .bar{border-radius:16px 16px 6px 6px;background:var(--c);color:#fff;font-weight:900;font-size:26px;display:flex;align-items:flex-start;justify-content:center;padding-top:10px}
+.pod .nm{font-weight:800;margin-bottom:6px;font-size:16px}
+.pod .sc{font-weight:800;font-size:20px}
+.medal{font-size:34px;line-height:1}
+
+/* ---- 녹음 ---- */
+.rec{width:120px;height:120px;border-radius:50%;border:0;background:var(--brand);color:#fff;font:inherit;font-weight:800;font-size:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;margin:10px auto;cursor:pointer;box-shadow:0 8px 0 #ffd1da}
+.rec.on{background:#e5484d;animation:pulse 1s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 14px rgba(229,72,77,.15)}}
+.rec svg{width:34px;height:34px}
+.vlist{display:grid;gap:8px;margin-top:10px}
+.vi{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:14px;background:var(--soft);font-weight:700}
+.vi span{flex:1}
+.vi small{color:var(--sub);font-weight:500;font-size:12px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="overlay" class="overlay hide"><span id="ovt"></span></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+/* =========================================================
+   ★ Firebase 설정 — 여기만 바꾸면 됩니다 ★
+   비워두면 "체험 모드"(이 브라우저 안에서만 작동)로 열립니다.
+   ========================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyCvi-oMFJ7HVTZt1jEIRRC-hISB1QxCKEk",
+  authDomain: "mole-game-f6eec.firebaseapp.com",
+  databaseURL: "https://mole-game-f6eec-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "mole-game-f6eec",
+  appId: "1:23804963522:web:ecc7d09c6b52d2dbeea95b"
+};
+/* ========================================================= */
+
+const GAME_MS = 30000;          // 게임 시간
+const POINTS = { mole:1, gold:3, bomb:-2 };
+const COLORS = ['#ff6b6b','#ffa94d','#fcc419','#51cf66','#339af0','#9775fa','#f783ac'];
+
+/* ---------- 도구 ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clone = v => v == null ? null : JSON.parse(JSON.stringify(v));
+const LS = {
+  get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch(e){ return null; } },
+  set(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} },
+  del(k){ try { localStorage.removeItem(k); } catch(e){} }
+};
+function rid(n){ const a='abcdefghjkmnpqrstuvwxyz23456789'; let s=''; for (const x of crypto.getRandomValues(new Uint32Array(n))) s+=a[x%a.length]; return s; }
+function mulberry32(a){ return () => { a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+
+/* ---------- 저장소 (Firebase 또는 체험 모드) ---------- */
+let DB;
+if (firebaseConfig.databaseURL && window.firebase) {
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+  DB = {
+    demo:false, offset:0,
+    on(p, cb){ const r=db.ref(p); const h=s=>cb(s.val()); r.on('value',h); return () => r.off('value',h); },
+    get: p => db.ref(p).get().then(s => s.val()),
+    set: (p,v) => db.ref(p).set(v),
+    update: (p,o) => db.ref(p).update(o),
+    remove: p => db.ref(p).remove(),
+    presence(p, val){ // 접속 중 표시, 연결 끊기면 online:false
+      const ref = db.ref(p), con = db.ref('.info/connected');
+      const h = s => { if (s.val()) { ref.onDisconnect().update({ online:false }); ref.update(val()); } };
+      con.on('value', h);
+      return () => { con.off('value', h); ref.onDisconnect().cancel(); };
+    }
+  };
+  db.ref('.info/serverTimeOffset').on('value', s => { DB.offset = s.val() || 0; });
+} else {
+  DB = makeDemoDB();
+  if (firebaseConfig.databaseURL && !window.firebase) DB.loadError = true;
+}
+function makeDemoDB(){
+  const KEY='mole-demo'; let tree=LS.get(KEY)||{}; const subs=new Set();
+  const parts=p=>p.split('/').filter(Boolean);
+  const getAt=p=>parts(p).reduce((o,k)=>o==null?undefined:o[k],tree);
+  function setAt(p,v){ const ks=parts(p); let o=tree;
+    for(let i=0;i<ks.length-1;i++){ if(typeof o[ks[i]]!=='object'||o[ks[i]]===null) o[ks[i]]={}; o=o[ks[i]]; }
+    if(v==null) delete o[ks[ks.length-1]]; else o[ks[ks.length-1]]=clone(v); }
+  const emit=()=>subs.forEach(s=>s.cb(clone(getAt(s.p)??null)));
+  const save=()=>{ LS.set(KEY,tree); emit(); };
+  addEventListener('storage',e=>{ if(e.key===KEY){ tree=LS.get(KEY)||{}; emit(); } });
+  return { demo:true, offset:0,
+    on(p,cb){ const s={p,cb}; subs.add(s); cb(clone(getAt(p)??null)); return ()=>subs.delete(s); },
+    get: async p => clone(getAt(p)??null),
+    set: async (p,v) => { setAt(p,v); save(); },
+    update: async (p,o) => { for(const k in o) setAt(p+'/'+k,o[k]); save(); },
+    remove: async p => { setAt(p,null); save(); },
+    presence(p,val){ const o=val(); for(const k in o) setAt(p+'/'+k,o[k]); save(); return ()=>{}; }
+  };
+}
+const now = () => Date.now() + (DB.offset || 0);
+
+/* ---------- 나 ---------- */
+const ME = (() => { let m = LS.get('mg-me');
+  if (!m || !m.pid) { m = { pid:rid(10), name:'', color:COLORS[Math.floor(Math.random()*COLORS.length)] }; LS.set('mg-me', m); }
+  return m; })();
+const saveMe = () => LS.set('mg-me', ME);
+
+/* ---------- 소리 ---------- */
+let AC = null;
+function ac(){ if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)(); return AC; }
+function unlockAudio(){
+  const c = ac(); if (c.state === 'suspended') c.resume();
+  if (!c._unlocked) { const b=c.createBuffer(1,1,22050), s=c.createBufferSource(); s.buffer=b; s.connect(c.destination); s.start(0); c._unlocked=true; }
+}
+addEventListener('pointerdown', unlockAudio, { capture:true });
+addEventListener('touchend', unlockAudio, { capture:true });
+
+function tone(type, f1, f2, dur, vol=0.25, delay=0){
+  const c=ac(), t=c.currentTime+delay, o=c.createOscillator(), g=c.createGain();
+  o.type=type; o.frequency.setValueAtTime(f1,t); o.frequency.exponentialRampToValueAtTime(f2,t+dur);
+  g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+  o.connect(g).connect(c.destination); o.start(t); o.stop(t+dur+0.02);
+}
+function noise(dur, vol, f1, f2){
+  const c=ac(), t=c.currentTime, n=Math.floor(c.sampleRate*dur), b=c.createBuffer(1,n,c.sampleRate), d=b.getChannelData(0);
+  for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*(1-i/n);
+  const s=c.createBufferSource(), f=c.createBiquadFilter(), g=c.createGain();
+  s.buffer=b; f.type='lowpass'; f.frequency.setValueAtTime(f1,t); f.frequency.exponentialRampToValueAtTime(f2,t+dur);
+  g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+  s.connect(f).connect(g).connect(c.destination); s.start(t);
+}
+const SFX = {
+  bonk(){ tone('square',950,260,0.13,0.18); noise(0.06,0.25,3000,800); },
+  gold(){ [880,1175,1568,2093].forEach((f,i)=>tone('triangle',f,f*1.01,0.16,0.2,i*0.06)); },
+  bomb(){ noise(0.75,0.9,2200,60); tone('sine',140,35,0.6,0.7); },
+  beep(hi){ tone('sine',hi?1320:660,hi?1320:660,hi?0.35:0.15,0.25); },
+  miss(){ tone('sine',520,180,0.35,0.22); tone('sine',380,140,0.35,0.15,0.18); },
+  end(){ [784,659,523].forEach((f,i)=>tone('triangle',f,f,0.22,0.22,i*0.14)); }
+};
+
+/* ---------- 목소리 (놀리는 소리) ---------- */
+const V = { raw:{}, buf:{}, playing:false, onchange:null };
+function b64ToBytes(b64){ const s=atob(b64), u=new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i); return u; }
+function bytesToB64(u){ let s=''; for(let i=0;i<u.length;i+=0x8000) s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000)); return btoa(s); }
+function decodeAB(ab){ return new Promise((res,rej)=>{ const p=ac().decodeAudioData(ab,res,rej); if(p&&p.then) p.then(res,rej); }); }
+DB.on('voices', v => {
+  V.raw = v || {};
+  for (const id of Object.keys(V.buf)) if (!V.raw[id]) delete V.buf[id];
+  for (const [id,x] of Object.entries(V.raw)) {
+    if (V.buf[id] || !x || !x.wav) continue;
+    V.buf[id] = 'loading';
+    decodeAB(b64ToBytes(x.wav).buffer).then(b => { V.buf[id]=b; }).catch(() => { delete V.buf[id]; });
+  }
+  if (V.onchange) V.onchange();
+});
+function playBuffer(b, done){
+  const c=ac(), s=c.createBufferSource(), g=c.createGain(); g.gain.value=1.4;
+  s.buffer=b; s.connect(g).connect(c.destination); s.onended=done; s.start();
+}
+function tease(){
+  if (V.playing) return;
+  const list = Object.values(V.buf).filter(b => b && b !== 'loading');
+  if (!list.length) { SFX.miss(); return; }
+  V.playing = true;
+  playBuffer(list[Math.floor(Math.random()*list.length)], () => { V.playing=false; });
+}
+// 녹음 → 16kHz 모노 WAV (아이폰·안드로이드 모두 재생되도록)
+function toWav(buf){
+  const sr=16000, ch=buf.numberOfChannels, len=buf.length, mono=new Float32Array(len);
+  for(let c=0;c<ch;c++){ const d=buf.getChannelData(c); for(let i=0;i<len;i++) mono[i]+=d[i]/ch; }
+  const th=0.02; let s=0, e=len-1;
+  while(s<len && Math.abs(mono[s])<th) s++;
+  while(e>s && Math.abs(mono[e])<th) e--;
+  if (e-s < buf.sampleRate*0.15) return null;
+  s=Math.max(0,s-Math.floor(buf.sampleRate*0.04)); e=Math.min(len-1,e+Math.floor(buf.sampleRate*0.12));
+  let peak=0; for(let i=s;i<=e;i++) peak=Math.max(peak,Math.abs(mono[i]));
+  const gain=Math.min(5,0.92/peak), ratio=buf.sampleRate/sr, n=Math.floor((e-s)/ratio);
+  const out=new DataView(new ArrayBuffer(44+n*2));
+  const w=(o,str)=>{ for(let i=0;i<str.length;i++) out.setUint8(o+i,str.charCodeAt(i)); };
+  w(0,'RIFF'); out.setUint32(4,36+n*2,true); w(8,'WAVE'); w(12,'fmt '); out.setUint32(16,16,true);
+  out.setUint16(20,1,true); out.setUint16(22,1,true); out.setUint32(24,sr,true); out.setUint32(28,sr*2,true);
+  out.setUint16(32,2,true); out.setUint16(34,16,true); w(36,'data'); out.setUint32(40,n*2,true);
+  for(let i=0;i<n;i++){ const p=s+i*ratio, i0=Math.floor(p), f=p-i0;
+    let v=(mono[i0]*(1-f)+(mono[i0+1]||0)*f)*gain; v=Math.max(-1,Math.min(1,v)); out.setInt16(44+i*2,v*32767,true); }
+  return new Uint8Array(out.buffer);
+}
+
+/* ---------- 그림 ---------- */
+function moleSVG(kind){
+  const gold = kind==='gold', body = gold?'#f5b82e':'#8d6e63', belly = gold?'#ffe28f':'#c9a89a', paw = gold?'#e09b12':'#6d5248';
+  return `<svg viewBox="0 0 100 100">
+  ${gold?'<path d="M33 25 l5-15 12 10 12-10 5 15z" fill="#ffd43b" stroke="#e0a800" stroke-width="2.5" stroke-linejoin="round"/>':''}
+  <path d="M12 104 V60 a38 38 0 0 1 76 0 V104z" fill="${body}"/>
+  <ellipse cx="50" cy="88" rx="25" ry="20" fill="${belly}"/>
+  <g class="f-ok"><circle cx="36" cy="54" r="5.5" fill="#2b2433"/><circle cx="64" cy="54" r="5.5" fill="#2b2433"/><circle cx="37.8" cy="52.2" r="1.8" fill="#fff"/><circle cx="65.8" cy="52.2" r="1.8" fill="#fff"/></g>
+  <g class="f-hit" stroke="#2b2433" stroke-width="3.2" stroke-linecap="round" fill="none"><path d="M31 49 l9 9 M40 49 l-9 9 M60 49 l9 9 M69 49 l-9 9"/></g>
+  <circle cx="26" cy="66" r="5.5" fill="#ff9fb0" opacity=".75"/><circle cx="74" cy="66" r="5.5" fill="#ff9fb0" opacity=".75"/>
+  <ellipse cx="50" cy="65" rx="8.5" ry="6" fill="#ff7a93"/>
+  <rect x="46" y="71" width="8" height="6.5" rx="1.5" fill="#fff"/>
+  <ellipse cx="25" cy="88" rx="8" ry="6" fill="${paw}"/><ellipse cx="75" cy="88" rx="8" ry="6" fill="${paw}"/>
+  </svg>`;
+}
+const BOMB = `<svg viewBox="0 0 100 100">
+  <path d="M50 30 q4-16 18-16" stroke="#a0784f" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <g class="spark"><circle cx="70" cy="13" r="7" fill="#ffd43b"/><circle cx="70" cy="13" r="3.5" fill="#fff"/></g>
+  <rect x="42" y="28" width="16" height="12" rx="3" fill="#5c5f6b"/>
+  <circle cx="50" cy="68" r="32" fill="#2f3140"/>
+  <circle cx="39" cy="57" r="8" fill="#fff" opacity=".22"/>
+  <g class="f-ok"><path d="M36 64 l8 4 M64 64 l-8 4" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><circle cx="41" cy="72" r="3" fill="#fff"/><circle cx="59" cy="72" r="3" fill="#fff"/></g>
+  <g class="f-hit"><circle cx="50" cy="68" r="14" fill="#ff8a3d"/></g>
+  </svg>`;
+const HAMMER = `<svg viewBox="0 0 100 100"><rect x="44" y="36" width="12" height="60" rx="5" fill="#d9a066"/><rect x="12" y="10" width="76" height="32" rx="13" fill="#ff5c7a"/><rect x="12" y="10" width="15" height="32" rx="7" fill="#ffc2cf"/><rect x="73" y="10" width="15" height="32" rx="7" fill="#ffc2cf"/></svg>`;
+const ICON = `<svg viewBox="0 0 40 40"><ellipse cx="20" cy="34" rx="16" ry="5" fill="#4e372c"/><path d="M8 34 V22 a12 12 0 0 1 24 0 V34z" fill="#8d6e63"/><circle cx="15.5" cy="22" r="2" fill="#2b2433"/><circle cx="24.5" cy="22" r="2" fill="#2b2433"/><ellipse cx="20" cy="26.5" rx="3" ry="2.2" fill="#ff7a93"/></svg>`;
+const HERO = `<svg viewBox="0 0 220 150">
+  <ellipse cx="110" cy="140" rx="95" ry="9" fill="#eaf7e2"/>
+  <ellipse cx="110" cy="126" rx="58" ry="16" fill="#4e372c"/>
+  <g transform="translate(70 46) scale(.8)">${moleSVG('mole').replace('<svg viewBox="0 0 100 100">','').replace('</svg>','')}</g>
+  <path d="M52 126 h116 a58 16 0 0 1 -116 0z" fill="#7a5644"/>
+  <g transform="translate(128 6) rotate(28 30 60)"><rect x="25" y="28" width="9" height="56" rx="4" fill="#d9a066"/><rect x="0" y="8" width="60" height="26" rx="11" fill="#ff5c7a"/><rect x="0" y="8" width="12" height="26" rx="6" fill="#ffc2cf"/><rect x="48" y="8" width="12" height="26" rx="6" fill="#ffc2cf"/></g>
+  <g fill="#ffb020"><path d="M40 40 l3 7 7 3-7 3-3 7-3-7-7-3 7-3z"/><circle cx="186" cy="80" r="3"/></g><circle cx="30" cy="90" r="3" fill="#a9c2ff"/>
+  </svg>`;
+const MIC = `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><rect x="8.5" y="3" width="7" height="11" rx="3.5" fill="#fff"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>`;
+
+/* ---------- 화면 ---------- */
+const app = $('#app');
+function paint(html){
+  const banner = DB.loadError ? `<div class="demo" style="background:var(--bad-soft);color:#b3262b">인터넷 연결을 확인해 주세요. 저장소에 연결하지 못했어요.</div>`
+    : DB.demo ? `<div class="demo">체험 모드 · Firebase 연결 전이라 이 브라우저 안에서만 작동해요.</div>` : '';
+  app.innerHTML = banner + html;
+}
+const header = (right='') => `<div class="top"><div class="brand">${ICON}뿅뿅 두더지</div>${right}</div>`;
+let cleanups = [];
+function reset(){ cleanups.forEach(f=>f()); cleanups=[]; V.onchange=null; $('#overlay').classList.add('hide'); }
+
+function route(){
+  reset();
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (h.get('v') !== null) return voiceView(h.get('r'));
+  if (h.get('r')) return roomView(h.get('r'));
+  homeView();
+}
+addEventListener('hashchange', route);
+
+/* ================= 첫 화면 ================= */
+function homeView(){
+  const vc = Object.keys(V.raw).length;
+  paint(`${header()}
+  <div class="hero">${HERO}<h1>뿅뿅 두더지</h1><p class="sub">가족이 함께하는 두더지 잡기 대결</p></div>
+  <div class="card">
+    <label class="f" style="margin-top:0">내 이름</label><input id="name" maxlength="8" placeholder="예) 아빠" value="${esc(ME.name)}">
+    <label class="f">내 색깔</label>
+    <div class="colors">${COLORS.map(c=>`<button data-c="${c}" style="background:${c}" class="${c===ME.color?'on':''}"></button>`).join('')}</div>
+    <div id="err"></div>
+  </div>
+  <div class="card">
+    <button class="btn" id="make">방 만들기</button>
+    <label class="f">가족이 만든 방에 들어가기</label>
+    <div class="row"><input id="rcode" class="code-in" inputmode="numeric" maxlength="3" placeholder="000"><button class="btn ghost small" id="join" style="flex:none;padding:16px 18px">입장</button></div>
+  </div>
+  <div style="text-align:center;margin-top:18px"><button class="link" id="voice">🎤 놀리는 목소리 녹음 (${vc}개)</button></div>`);
+  const err = m => $('#err').innerHTML = `<div class="msg err">${m}</div>`;
+  $('#name').oninput = e => { ME.name = e.target.value.trim(); saveMe(); };
+  document.querySelectorAll('.colors button').forEach(b => b.onclick = () => {
+    ME.color = b.dataset.c; saveMe(); document.querySelectorAll('.colors button').forEach(x => x.classList.toggle('on', x===b)); });
+  $('#rcode').oninput = e => e.target.value = e.target.value.replace(/\D/g,'').slice(0,3);
+  $('#voice').onclick = () => location.hash = 'v';
+  $('#make').onclick = async () => {
+    if (!ME.name) return err('이름을 먼저 적어주세요.');
+    $('#make').disabled = true;
+    try {
+      let code;
+      for (let i=0;i<30;i++){ const c=String(100+Math.floor(Math.random()*900)); const ex=await DB.get('rooms/'+c);
+        if (!ex || now()-(ex.createdAt||0) > 6*3600e3) { code=c; break; } }
+      await DB.set('rooms/'+code, { createdAt:now(), state:'lobby', round:0 });
+      location.hash = 'r='+code;
+    } catch(e) { $('#make').disabled=false; err('방을 만들지 못했어요. 인터넷 연결을 확인해 주세요.'); }
+  };
+  $('#join').onclick = async () => {
+    if (!ME.name) return err('이름을 먼저 적어주세요.');
+    const c = $('#rcode').value;
+    if (!/^\d{3}$/.test(c)) return err('방 번호 3자리를 입력해 주세요.');
+    const ex = await DB.get('rooms/'+c).catch(()=>null);
+    if (!ex || now()-(ex.createdAt||0) > 6*3600e3) return err('그 번호의 방이 없어요. 번호를 확인해 주세요.');
+    location.hash = 'r='+c;
+  };
+}
+
+/* ================= 방 (대기실 · 게임 · 결과) ================= */
+function makeSchedule(seed){
+  const r = mulberry32(seed), ev = [], busy = Array(9).fill(0);
+  let t = 250;
+  while (t < GAME_MS - 500) {
+    const p = t / GAME_MS;
+    const d = 1050 - 380*p + r()*160;
+    let h = -1;
+    for (let k=0;k<12;k++){ const c=Math.floor(r()*9); if (busy[c] <= t) { h=c; break; } }
+    if (h >= 0) {
+      const x = r(), type = x < 0.11 ? 'gold' : x < 0.24 ? 'bomb' : 'mole';
+      const dd = type==='gold' ? d*0.72 : d;
+      ev.push({ t, h, type, d:dd }); busy[h] = t + dd + 150;
+    }
+    t += 640 - 330*p + r()*220;
+  }
+  return ev;
+}
+
+function roomView(code){
+  if (!ME.name) { location.hash=''; return; }
+  const path = 'rooms/'+code;
+  const R = { code, data:null, view:null, round:null, ev:null, hits:new Map(), score:0, raf:0, lastCount:null, ended:false };
+  cleanups.push(DB.presence(path+'/players/'+ME.pid, () => ({ name:ME.name, color:ME.color, online:true, joinedAt:now() })));
+  cleanups.push(() => cancelAnimationFrame(R.raf));
+
+  const players = () => Object.entries((R.data && R.data.players) || {}).map(([pid,p]) => ({ pid, ...p }));
+  const elapsed = () => now() - R.data.startAt;
+
+  function want(){
+    const d = R.data;
+    if (!d) return 'none';
+    if (d.state === 'playing' && d.startAt) return elapsed() < GAME_MS + 1600 ? 'game' : 'result';
+    return 'lobby';
+  }
+  function render(){
+    const w = want();
+    if (w === 'game' && R.view === 'game' && R.round === R.data.round) { drawChips(); return; }
+    R.view = w;
+    if (w === 'none') { paint(`${header()}<div class="msg err">방이 없어졌어요.</div><div style="height:10px"></div><button class="btn ghost" id="home">처음으로</button>`); $('#home').onclick=()=>location.hash=''; return; }
+    if (w === 'lobby') return lobby();
+    if (w === 'game') return game();
+    return result();
+  }
+
+  function startRound(){
+    const d = R.data;
+    DB.update(path, { state:'playing', round:(d.round||0)+1, seed:Math.floor(Math.random()*2**31), startAt:now()+3800 });
+  }
+  function leave(){ DB.remove(path+'/players/'+ME.pid); location.hash=''; }
+
+  /* --- 대기실 --- */
+  function lobby(){
+    const ps = players().filter(p => p.online !== false);
+    const vc = Object.keys(V.raw).length;
+    paint(`${header('<button class="link" id="out">나가기</button>')}
+      <div class="card" style="text-align:center"><p class="sub">방 번호 · 가족에게 알려주세요</p><div class="bigcode">${esc(code)}</div></div>
+      <div class="card"><h2>들어온 사람 · ${ps.length}명</h2>
+        <div class="plist">${ps.map(p=>`<div class="pl" style="--c:${p.color}"><span class="dot"></span>${esc(p.name)} ${p.pid===ME.pid?'<span class="me">(나)</span>':''}</div>`).join('')}</div>
+        <div style="height:14px"></div><button class="btn" id="go">시작! (30초)</button>
+        <p class="sub" style="text-align:center;margin-top:10px">모두 들어오면 아무나 시작을 누르세요</p></div>
+      <div style="text-align:center;margin-top:16px"><button class="link" id="voice">🎤 놀리는 목소리 ${vc}개 · 녹음하러 가기</button></div>`);
+    $('#go').onclick = startRound;
+    $('#out').onclick = leave;
+    $('#voice').onclick = () => location.hash = 'v&r='+code;
+  }
+
+  /* --- 게임 --- */
+  function game(){
+    const d = R.data;
+    R.round = d.round; R.ev = makeSchedule(d.seed); R.hits = new Map(); R.score = 0; R.lastCount = null; R.ended = false;
+    R.byHole = Array.from({length:9}, () => []);
+    R.ev.forEach((e,i) => R.byHole[e.h].push(i));
+    DB.update(path+'/players/'+ME.pid, { score:0, round:d.round });
+    paint(`<div class="hud"><div class="timebar"><i id="tb" style="width:100%"></i></div><div class="secs" id="secs">30</div></div>
+      <div class="chips" id="chips"></div>
+      <div class="board" id="board"><div class="grid">${Array.from({length:9},(_,i)=>`<div class="hole" data-h="${i}"><div class="pit"></div><div class="win"><div class="mole"></div></div><div class="lip"></div></div>`).join('')}</div></div>`);
+    R.holes = [...document.querySelectorAll('.hole')].map(el => ({ el, mole:el.querySelector('.mole'), cur:-1, cls:'' }));
+    R.holes.forEach((H,i) => H.el.addEventListener('pointerdown', e => { e.preventDefault(); tap(i, e); }));
+    drawChips();
+    cancelAnimationFrame(R.raf);
+    const loop = () => { frame(); if (R.view === 'game') R.raf = requestAnimationFrame(loop); };
+    R.raf = requestAnimationFrame(loop);
+  }
+  function activeEvent(h, el){
+    for (const i of R.byHole[h]) { const e = R.ev[i]; if (el >= e.t && el < e.t + e.d) return i; if (e.t > el) break; }
+    return -1;
+  }
+  function frame(){
+    const el = elapsed(), ov = $('#overlay'), ovt = $('#ovt');
+    // 카운트다운
+    if (el < 0) {
+      const n = Math.min(3, Math.ceil(-el/1000));
+      ov.classList.remove('hide'); ovt.textContent = n;
+      if (R.lastCount !== n) { R.lastCount = n; SFX.beep(false); }
+    } else if (el < 600) {
+      ov.classList.remove('hide'); ovt.textContent = '시작!';
+      if (R.lastCount !== 0) { R.lastCount = 0; SFX.beep(true); }
+    } else if (el >= GAME_MS) {
+      ov.classList.remove('hide'); ovt.textContent = '끝!';
+      if (!R.ended) { R.ended = true; SFX.end(); }
+    } else ov.classList.add('hide');
+    // 시간
+    const left = Math.max(0, Math.min(GAME_MS, GAME_MS - el));
+    const tb = $('#tb'), sc = $('#secs');
+    if (tb) tb.style.width = (left/GAME_MS*100) + '%';
+    if (sc) sc.textContent = Math.ceil(left/1000);
+    // 두더지
+    R.holes.forEach((H,h) => {
+      let cls = '', idx = -1;
+      const hitIdx = [...R.hits.entries()].find(([i,at]) => R.ev[i].h===h && el < at + 320);
+      if (hitIdx) { idx = hitIdx[0]; cls = 'hit'; }
+      else { idx = el >= 0 && el < GAME_MS ? activeEvent(h, el) : -1; if (idx >= 0 && !R.hits.has(idx)) cls = 'up'; else idx = -1; }
+      if (idx !== H.cur) { H.cur = idx; if (idx >= 0) H.mole.innerHTML = R.ev[idx].type==='bomb' ? BOMB : moleSVG(R.ev[idx].type); }
+      if (cls !== H.cls) { H.cls = cls; H.el.classList.toggle('up', cls==='up'); H.el.classList.toggle('hit', cls==='hit'); }
+    });
+    if (el >= GAME_MS + 1600) render();
+  }
+  function tap(h, e){
+    const el = elapsed();
+    if (el < 0 || el >= GAME_MS) return;
+    showHammer(e.clientX, e.clientY);
+    const i = activeEvent(h, el);
+    const hole = R.holes[h].el;
+    if (i >= 0 && !R.hits.has(i)) {
+      R.hits.set(i, el);
+      const type = R.ev[i].type, pts = POINTS[type];
+      R.score += pts;
+      DB.update(path+'/players/'+ME.pid, { score:R.score, round:R.round });
+      floatText(hole, (pts>0?'+':'')+pts, type==='bomb' ? '#e5484d' : type==='gold' ? '#e0a800' : '#16a36a');
+      if (type === 'bomb') { SFX.bomb(); const b=document.createElement('div'); b.className='boom'; hole.appendChild(b); setTimeout(()=>b.remove(),500);
+        const bd=$('#board'); bd.classList.remove('shake'); void bd.offsetWidth; bd.classList.add('shake'); }
+      else if (type === 'gold') { SFX.bonk(); SFX.gold(); }
+      else SFX.bonk();
+    } else {
+      floatText(hole, '헛방!', '#8a8f9c');
+      tease();
+    }
+  }
+  function showHammer(x, y){
+    const d = document.createElement('div'); d.className = 'hammer'; d.innerHTML = HAMMER;
+    d.style.left = x+'px'; d.style.top = y+'px'; document.body.appendChild(d); setTimeout(() => d.remove(), 260);
+  }
+  function floatText(hole, txt, color){
+    const f = document.createElement('div'); f.className='float'; f.textContent=txt; f.style.color=color;
+    hole.appendChild(f); setTimeout(() => f.remove(), 720);
+  }
+  function drawChips(){
+    const box = $('#chips'); if (!box) return;
+    const ps = players().filter(p => p.round === R.round || p.pid === ME.pid)
+      .map(p => ({ ...p, s: p.pid===ME.pid ? R.score : (p.round===R.round ? p.score||0 : 0) })).sort((a,b) => b.s - a.s);
+    box.innerHTML = ps.map(p => `<span class="chip ${p.pid===ME.pid?'mine':''}" style="--c:${p.color}"><span class="dot"></span>${esc(p.name)} <b>${p.s}</b></span>`).join('');
+  }
+
+  /* --- 결과 --- */
+  function result(){
+    $('#overlay').classList.add('hide');
+    const d = R.data;
+    const ps = players().filter(p => p.round === d.round).sort((a,b) => (b.score||0) - (a.score||0));
+    const medals = ['🥇','🥈','🥉'], heights = [150,110,80];
+    const order = ps.length >= 3 ? [1,0,2] : ps.length === 2 ? [1,0] : [0];
+    paint(`${header('<button class="link" id="out">나가기</button>')}
+      <div style="text-align:center;margin-top:8px"><h1>${ps.length ? esc(ps[0].name)+' 승리! 🎉' : '게임 끝!'}</h1></div>
+      <div class="podium">${order.filter(i=>ps[i]).map(i => `<div class="pod" style="--c:${ps[i].color}">
+        <div class="medal">${medals[i]}</div><div class="nm">${esc(ps[i].name)}</div><div class="sc">${ps[i].score||0}점</div>
+        <div class="bar" style="height:${heights[i]}px">${i+1}</div></div>`).join('')}</div>
+      ${ps.length > 3 ? `<div class="card"><div class="plist">${ps.slice(3).map((p,k)=>`<div class="pl" style="--c:${p.color}"><span class="dot"></span>${k+4}등 ${esc(p.name)} <span style="margin-left:auto">${p.score||0}점</span></div>`).join('')}</div></div>` : ''}
+      <div style="height:20px"></div>
+      <button class="btn" id="again">한 판 더!</button>
+      <div style="text-align:center;margin-top:16px"><button class="link" id="voice">🎤 놀리는 목소리 녹음</button></div>`);
+    $('#again').onclick = startRound;
+    $('#out').onclick = leave;
+    $('#voice').onclick = () => location.hash = 'v&r='+code;
+  }
+
+  cleanups.push(DB.on(path, d => { R.data = d; render(); }));
+}
+
+/* ================= 목소리 녹음 ================= */
+function voiceView(back){
+  const S = { rec:null, stream:null, timer:0, msg:'' };
+  function draw(){
+    const list = Object.entries(V.raw).sort((a,b) => (a[1].at||0) - (b[1].at||0));
+    paint(`${header(`<button class="link" id="back">← 돌아가기</button>`)}
+      <div style="text-align:center;margin-top:10px"><h1>놀리는 목소리</h1>
+      <p class="sub">빈 구멍을 때리면 여기 목소리 중 하나가 나와요.<br>최대 3초, 크게 또박또박!</p></div>
+      <button class="rec ${S.rec?'on':''}" id="rec">${MIC}${S.rec?'녹음 중… (멈추기)':'녹음하기'}</button>
+      ${S.msg ? `<div class="msg ${S.msg.startsWith('!')?'err':'info'}" style="text-align:center">${esc(S.msg.replace(/^!/,''))}</div>` : ''}
+      <div class="card"><h2>저장된 목소리 · ${list.length}개</h2>
+        ${list.length ? `<div class="vlist">${list.map(([id,x],k)=>`<div class="vi"><span>목소리 ${k+1} <small>${esc(x.by||'')}</small></span>
+          <button class="btn ghost small" data-play="${id}">▶ 듣기</button><button class="btn ghost small" data-del="${id}">삭제</button></div>`).join('')}</div>`
+          : '<p class="sub">아직 없어요. 녹음해 보세요! (없으면 기본 "삐융~" 소리가 나요)</p>'}</div>`);
+    $('#back').onclick = () => { stop(true); location.hash = back ? 'r='+back : ''; };
+    $('#rec').onclick = () => S.rec ? stop() : start();
+    document.querySelectorAll('[data-play]').forEach(b => b.onclick = () => { const x=V.buf[b.dataset.play]; if (x && x!=='loading') playBuffer(x, ()=>{}); });
+    document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { if (confirm('이 목소리를 지울까요?')) DB.remove('voices/'+b.dataset.del); });
+  }
+  async function start(){
+    if (!navigator.mediaDevices || !window.MediaRecorder) { S.msg='!이 기기에서는 녹음을 지원하지 않아요.'; return draw(); }
+    if (Object.keys(V.raw).length >= 10) { S.msg='!목소리는 10개까지예요. 하나를 지우고 녹음해 주세요.'; return draw(); }
+    try { S.stream = await navigator.mediaDevices.getUserMedia({ audio:true }); }
+    catch(e) { S.msg='!마이크 사용을 허용해 주세요. (설정 → Safari/Chrome → 마이크)'; return draw(); }
+    const chunks = [];
+    S.rec = new MediaRecorder(S.stream);
+    S.rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    S.rec.onstop = async () => {
+      S.stream.getTracks().forEach(t => t.stop());
+      if (S.cancel) return;
+      try {
+        const ab = await new Blob(chunks, { type: S.rec.mimeType || 'audio/mp4' }).arrayBuffer();
+        const buf = await decodeAB(ab);
+        const wav = toWav(buf);
+        S.rec = null;
+        if (!wav) { S.msg='!소리가 너무 작아요. 조금 더 크게 다시 녹음해 주세요.'; return draw(); }
+        await DB.set('voices/'+rid(8), { wav:bytesToB64(wav), by:ME.name||'', at:now() });
+        S.msg = '저장했어요! 가족 모두의 게임에서 나와요.';
+      } catch(e) { S.rec = null; S.msg="!녹음을 저장하지 못했어요. 다시 해주세요."; }
+      draw();
+    };
+    S.cancel = false; S.msg = ''; S.rec.start();
+    S.timer = setTimeout(() => stop(), 3000);
+    draw();
+  }
+  function stop(cancel){
+    clearTimeout(S.timer);
+    if (S.rec && S.rec.state === 'recording') { S.cancel = !!cancel; S.rec.stop(); }
+    else if (cancel && S.stream) S.stream.getTracks().forEach(t => t.stop());
+  }
+  V.onchange = draw;
+  cleanups.push(() => stop(true));
+  draw();
+}
+
+route();
+</script>
+</body>
+</html>
