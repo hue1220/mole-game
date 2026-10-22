@@ -55,6 +55,9 @@ input:focus{border-color:var(--brand)}
 .seg button.on{background:#fff;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.1)}
 .lvtag{text-align:center;font-size:13px;font-weight:700;color:var(--sub);margin-top:4px}
 .facebox{width:180px;height:180px;margin:16px auto 0}
+.faces{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+.facecell{text-align:center}
+.facecell .facebox{width:100%;height:auto;aspect-ratio:1;margin:0 0 6px}
 .facebox svg{width:100%;height:100%}
 .bigcode{font-size:56px;font-weight:800;letter-spacing:.18em;color:var(--brand);text-align:center;line-height:1.1}
 .plist{display:grid;gap:8px;margin-top:8px}
@@ -290,8 +293,14 @@ function toWav(buf){
 
 /* ---------- 그림 ---------- */
 /* ---------- 황금 두더지 사진 ---------- */
-const P = { gold:null, onchange:null };
-DB.on('photos/gold', v => { P.gold = v && v.img ? v.img : null; if (P.onchange) P.onchange(); });
+const P = { list:[], current:null, onchange:null };   // list: [{id, img, path}]
+DB.on('photos', v => {
+  v = v || {}; const list = [];
+  if (v.gold && v.gold.img) list.push({ id:'gold', img:v.gold.img, at:v.gold.at||0, path:'photos/gold' });   // 예전 방식(1장)
+  for (const [id,x] of Object.entries(v.faces || {})) if (x && x.img) list.push({ id, img:x.img, at:x.at||0, path:'photos/faces/'+id });
+  list.sort((a,b) => a.at - b.at || (a.id < b.id ? -1 : 1));
+  P.list = list; if (P.onchange) P.onchange();
+});
 let faceN = 0;
 function goldFaceSVG(img){
   const id = 'gf' + (++faceN);
@@ -305,7 +314,7 @@ function goldFaceSVG(img){
   </svg>`;
 }
 function moleSVG(kind){
-  if (kind === 'gold' && P.gold) return goldFaceSVG(P.gold);
+  if (kind === 'gold' && P.current) return goldFaceSVG(P.current);
   const gold = kind==='gold', body = gold?'#f5b82e':'#8d6e63', belly = gold?'#ffe28f':'#c9a89a', paw = gold?'#e09b12':'#6d5248';
   return `<svg viewBox="0 0 100 100">
   ${gold?'<path d="M33 25 l5-15 12 10 12-10 5 15z" fill="#ffd43b" stroke="#e0a800" stroke-width="2.5" stroke-linejoin="round"/>':''}
@@ -378,7 +387,7 @@ function homeView(){
     <div class="row"><input id="rcode" class="code-in" inputmode="numeric" maxlength="3" placeholder="000"><button class="btn ghost small" id="join" style="flex:none;padding:16px 18px">입장</button></div>
   </div>
   <div style="text-align:center;margin-top:18px"><button class="link" id="voice">🎤 목소리 녹음 (${vc}개)</button>
-    <span class="sub"> · </span><button class="link" id="photo">📷 황금 두더지 사진</button></div>`);
+    <span class="sub"> · </span><button class="link" id="photo">📷 황금 두더지 얼굴</button></div>`);
   const err = m => $('#err').innerHTML = `<div class="msg err">${m}</div>`;
   $('#name').oninput = e => { ME.name = e.target.value.trim(); saveMe(); };
   document.querySelectorAll('.colors button').forEach(b => b.onclick = () => {
@@ -478,7 +487,7 @@ function roomView(code){
         <div style="height:14px"></div><button class="btn" id="go">시작! (30초 · ${LEVELS[lv].name})</button>
         <p class="sub" style="text-align:center;margin-top:10px">모두 들어오면 아무나 시작을 누르세요</p></div>
       <div style="text-align:center;margin-top:16px"><button class="link" id="voice">🎤 목소리 ${vc}개 · 녹음하러 가기</button>
-        <span class="sub"> · </span><button class="link" id="photo">📷 황금 두더지 사진</button></div>`);
+        <span class="sub"> · </span><button class="link" id="photo">📷 황금 두더지 얼굴</button></div>`);
     if (window.QRCode) new QRCode($('#qr'), { text: location.origin + location.pathname, width:150, height:150 });
     $('#go').onclick = startRound;
     $('#out').onclick = leave;
@@ -490,7 +499,8 @@ function roomView(code){
   /* --- 게임 --- */
   function game(){
     const d = R.data;
-    R.round = d.round; R.ev = makeSchedule(d.seed, d.playLevel); R.hits = new Map(); R.score = 0; R.lastCount = null; R.ended = false;
+    R.round = d.round; R.ev = makeSchedule(d.seed, d.playLevel);
+    P.current = P.list.length ? P.list[d.seed % P.list.length].img : null;   // 판마다 얼굴 하나 (모두 같은 얼굴) R.hits = new Map(); R.score = 0; R.lastCount = null; R.ended = false;
     R.byHole = Array.from({length:9}, () => []);
     R.ev.forEach((e,i) => R.byHole[e.h].push(i));
     DB.update(path+'/players/'+ME.pid, { score:0, round:d.round });
@@ -604,31 +614,40 @@ function roomView(code){
 function photoView(back){
   let msg = '';
   function draw(){
+    const L = P.list;
     paint(`${header(`<button class="link" id="back">← 돌아가기</button>`)}
-      <div style="text-align:center;margin-top:10px"><h1>황금 두더지 사진</h1>
-      <p class="sub">황금 두더지 대신 이 얼굴이 올라와요! (+3점)<br>얼굴이 가운데 오도록 자른 사진이 좋아요.</p></div>
-      <div class="facebox">${P.gold ? goldFaceSVG(P.gold) : moleSVG('mole').replace('<svg','<svg style="filter:sepia(1) saturate(4) hue-rotate(-10deg)"')}</div>
+      <div style="text-align:center;margin-top:10px"><h1>황금 두더지 얼굴</h1>
+      <p class="sub">판마다 이 중 한 얼굴이 무작위로 황금 두더지가 돼요! (+3점)<br>얼굴이 가운데 오도록 자른 사진이 좋아요.</p></div>
+      ${L.length ? `<div class="faces">${L.map(x=>`<div class="facecell"><div class="facebox">${goldFaceSVG(x.img)}</div><button class="btn ghost small" data-del="${esc(x.path)}">지우기</button></div>`).join('')}</div>`
+        : `<div class="facebox" style="width:160px;height:160px">${moleSVG('mole').replace('<svg','<svg style="filter:sepia(1) saturate(4) hue-rotate(-10deg)"')}</div><p class="sub" style="text-align:center">아직 얼굴이 없어서 원래 황금 두더지가 나와요.</p>`}
       ${msg ? `<div class="msg ${msg.startsWith('!')?'err':'info'}" style="text-align:center">${esc(msg.replace(/^!/,''))}</div>` : ''}
-      <label class="btn" style="margin-top:14px">📷 사진 고르기<input id="file" type="file" accept="image/*" hidden></label>
-      ${P.gold ? '<div style="height:10px"></div><button class="btn ghost" id="del">사진 지우기 (원래 황금 두더지로)</button>' : ''}
-      <p class="sub" style="text-align:center;margin-top:14px">사진은 이 게임 저장소(Firebase)에만 저장돼요.</p>`);
+      <label class="btn" style="margin-top:14px">📷 얼굴 사진 추가 (여러 장 선택 가능)<input id="file" type="file" accept="image/*" multiple hidden></label>
+      <p class="sub" style="text-align:center;margin-top:14px">사진은 이 게임 저장소(Firebase)에만 저장돼요. 최대 6장.</p>`);
     $('#back').onclick = () => location.hash = back ? 'r='+back : '';
-    $('#file').onchange = e => { const f = e.target.files[0]; if (f) save(f); };
-    if ($('#del')) $('#del').onclick = () => { if (confirm('사진을 지울까요?')) DB.remove('photos/gold'); };
-  }
-  function save(file){
-    const url = URL.createObjectURL(file), img = new Image();
-    img.onload = async () => {
-      const side = Math.min(img.naturalWidth, img.naturalHeight), size = 220;
-      const cv = document.createElement('canvas'); cv.width = cv.height = size;
-      const cx = cv.getContext('2d'); cx.fillStyle = '#fff6d6'; cx.fillRect(0,0,size,size); cx.drawImage(img, (img.naturalWidth-side)/2, (img.naturalHeight-side)/2, side, side, 0, 0, size, size);
-      URL.revokeObjectURL(url);
-      try { await DB.set('photos/gold', { img: cv.toDataURL('image/jpeg', 0.85), by: ME.name||'', at: now() }); msg = '저장했어요! 가족 모두의 게임에 나와요.'; }
-      catch(e) { msg = '!저장하지 못했어요. Firebase 규칙에 photos가 있는지 확인해 주세요.'; }
+    $('#file').onchange = async e => {
+      const files = [...e.target.files].slice(0, Math.max(0, 6 - P.list.length));
+      if (!files.length) { msg = '!얼굴은 6장까지예요. 하나를 지우고 추가해 주세요.'; return draw(); }
+      let ok = 0; for (const f of files) { if (await save(f)) ok++; }
+      msg = ok ? `${ok}장 저장했어요! 가족 모두의 게임에 나와요.` : '!저장하지 못했어요. Firebase 규칙에 photos가 있는지 확인해 주세요.';
       draw();
     };
-    img.onerror = () => { msg = '!사진을 읽지 못했어요. 다른 사진으로 해주세요.'; draw(); };
-    img.src = url;
+    document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { if (confirm('이 얼굴을 지울까요?')) DB.remove(b.dataset.del); });
+  }
+  function save(file){
+    return new Promise(res => {
+      const url = URL.createObjectURL(file), img = new Image();
+      img.onload = async () => {
+        const side = Math.min(img.naturalWidth, img.naturalHeight), size = 220;
+        const cv = document.createElement('canvas'); cv.width = cv.height = size;
+        const cx = cv.getContext('2d'); cx.fillStyle = '#fff6d6'; cx.fillRect(0,0,size,size);
+        cx.drawImage(img, (img.naturalWidth-side)/2, (img.naturalHeight-side)/2, side, side, 0, 0, size, size);
+        URL.revokeObjectURL(url);
+        try { await DB.set('photos/faces/'+rid(8), { img: cv.toDataURL('image/jpeg', 0.85), by: ME.name||'', at: now() }); res(true); }
+        catch(e) { res(false); }
+      };
+      img.onerror = () => res(false);
+      img.src = url;
+    });
   }
   P.onchange = draw;
   cleanups.push(() => { P.onchange = null; });
