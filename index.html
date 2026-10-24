@@ -392,7 +392,8 @@ function homeView(){
     <div class="row"><input id="rcode" class="code-in" inputmode="numeric" maxlength="3" placeholder="000"><button class="btn ghost small" id="join" style="flex:none;padding:16px 18px">입장</button></div>
   </div>
   <div style="text-align:center;margin-top:18px"><button class="link" id="voice">🎤 목소리 녹음 (${vc}개)</button>
-    <span class="sub"> · </span><button class="link" id="photo">📷 황금 두더지 얼굴</button></div>`);
+    <span class="sub"> · </span><button class="link" id="photo">📷 황금 두더지 얼굴</button></div>
+  <p class="sub" style="text-align:center;margin-top:14px;font-size:11px;color:#adb5bd">버전 10.24-3</p>`);
   const err = m => $('#err').innerHTML = `<div class="msg err">${m}</div>`;
   $('#name').oninput = e => { ME.name = e.target.value.trim(); saveMe(); };
   document.querySelectorAll('.colors button').forEach(b => b.onclick = () => {
