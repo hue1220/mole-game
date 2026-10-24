@@ -7,6 +7,9 @@
 <meta name="theme-color" content="#ffffff">
 <meta name="apple-mobile-web-app-title" content="뿅뿅 두더지">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
 :root{
@@ -167,6 +170,7 @@ if (firebaseConfig.databaseURL && window.firebase) {
     set: (p,v) => db.ref(p).set(v),
     update: (p,o) => db.ref(p).update(o),
     remove: p => db.ref(p).remove(),
+    transaction: (p, fn) => db.ref(p).transaction(fn),
     presence(p, val){ // 접속 중 표시, 연결 끊기면 online:false
       const ref = db.ref(p), con = db.ref('.info/connected');
       const h = s => { if (s.val()) { ref.onDisconnect().update({ online:false }); ref.update(val()); } };
@@ -195,6 +199,7 @@ function makeDemoDB(){
     set: async (p,v) => { setAt(p,v); save(); },
     update: async (p,o) => { for(const k in o) setAt(p+'/'+k,o[k]); save(); },
     remove: async p => { setAt(p,null); save(); },
+    transaction: async (p, fn) => { const r = fn(clone(getAt(p) ?? null)); if (r !== undefined) { setAt(p, r); save(); } },
     presence(p,val){ const o=val(); for(const k in o) setAt(p+'/'+k,o[k]); save(); return ()=>{}; }
   };
 }
@@ -446,7 +451,17 @@ function roomView(code){
   const path = 'rooms/'+code;
   const R = { code, data:null, view:null, round:null, ev:null, hits:new Map(), score:0, raf:0, lastCount:null, ended:false };
   cleanups.push(DB.presence(path+'/players/'+ME.pid, () => ({ name:ME.name, color:ME.color, online:true, joinedAt:now() })));
-  cleanups.push(() => cancelAnimationFrame(R.raf));
+  cleanups.push(() => { R.loopId = (R.loopId || 0) + 1; cancelAnimationFrame(R.raf); });
+  // 안전장치: 화면이 멈춘 것처럼 보이면(애니메이션이 끊기면) 0.5초마다 직접 화면을 다시 그려줌
+  const watchdog = setInterval(() => {
+    if (!R.data) return;
+    if (R.view === 'game' && Date.now() - (R.lastFrame || 0) > 700) frame();
+    else if (R.view !== want()) render();
+  }, 500);
+  cleanups.push(() => clearInterval(watchdog));
+  const onVis = () => { if (!document.hidden && R.data) render(); };
+  document.addEventListener('visibilitychange', onVis);
+  cleanups.push(() => document.removeEventListener('visibilitychange', onVis));
 
   const players = () => Object.entries((R.data && R.data.players) || {}).map(([pid,p]) => ({ pid, ...p }));
   const elapsed = () => now() - R.data.startAt;
@@ -459,7 +474,7 @@ function roomView(code){
   }
   function render(){
     const w = want();
-    if (w === 'game' && R.view === 'game' && R.round === R.data.round) { drawChips(); return; }
+    if (w === 'game' && R.view === 'game' && R.round === R.data.round && R.seed === R.data.seed) { drawChips(); return; }
     R.view = w;
     if (w === 'none') { paint(`${header()}<div class="msg err">방이 없어졌어요.</div><div style="height:10px"></div><button class="btn ghost" id="home">처음으로</button>`); $('#home').onclick=()=>location.hash=''; return; }
     if (w === 'lobby') return lobby();
@@ -468,8 +483,16 @@ function roomView(code){
   }
 
   function startRound(){
-    const d = R.data;
-    DB.update(path, { state:'playing', round:(d.round||0)+1, level:d.level||'normal', playLevel:d.level||'normal', seed:Math.floor(Math.random()*2**31), startAt:now()+3800 });
+    // 여러 명이 동시에 눌러도 한 번만 시작되도록 (먼저 누른 사람 것만 반영)
+    const expect = (R.data && R.data.round) || 0;
+    const seed = Math.floor(Math.random()*2**31), startAt = now()+3800;
+    DB.transaction(path, cur => {
+      if (!cur || (cur.round||0) !== expect) return;   // 이미 누가 시작함 → 취소
+      cur.state = 'playing'; cur.round = expect + 1;
+      cur.level = cur.level || 'normal'; cur.playLevel = cur.level;
+      cur.seed = seed; cur.startAt = startAt;
+      return cur;
+    });
   }
   function leave(){ DB.remove(path+'/players/'+ME.pid); location.hash=''; }
 
@@ -499,7 +522,7 @@ function roomView(code){
   /* --- 게임 --- */
   function game(){
     const d = R.data;
-    R.round = d.round; R.ev = makeSchedule(d.seed, d.playLevel);
+    R.round = d.round; R.seed = d.seed; R.ev = makeSchedule(d.seed, d.playLevel);
     P.current = P.list.length ? P.list[d.seed % P.list.length].img : null;   // 판마다 얼굴 하나 (모두 같은 얼굴) R.hits = new Map(); R.score = 0; R.lastCount = null; R.ended = false;
     R.byHole = Array.from({length:9}, () => []);
     R.ev.forEach((e,i) => R.byHole[e.h].push(i));
@@ -511,7 +534,8 @@ function roomView(code){
     R.holes.forEach((H,i) => H.el.addEventListener('pointerdown', e => { e.preventDefault(); tap(i, e); }));
     drawChips();
     cancelAnimationFrame(R.raf);
-    const loop = () => { frame(); if (R.view === 'game') R.raf = requestAnimationFrame(loop); };
+    const token = R.loopId = (R.loopId || 0) + 1;   // 이전 판의 반복이 남아 겹치지 않게
+    const loop = () => { if (token !== R.loopId) return; frame(); if (R.view === 'game' && token === R.loopId) R.raf = requestAnimationFrame(loop); };
     R.raf = requestAnimationFrame(loop);
   }
   function activeEvent(h, el){
@@ -519,6 +543,7 @@ function roomView(code){
     return -1;
   }
   function frame(){
+    R.lastFrame = Date.now();
     const el = elapsed(), ov = $('#overlay'), ovt = $('#ovt');
     // 카운트다운
     if (el < 0) {
