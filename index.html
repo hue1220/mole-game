@@ -124,6 +124,15 @@ input:focus{border-color:var(--brand)}
 <body>
 <div id="app"></div>
 <div id="overlay" class="overlay hide"><span id="ovt"></span></div>
+<div id="errbox" style="display:none;position:fixed;left:8px;right:8px;bottom:8px;z-index:9999;background:#fdecec;color:#b3262b;font:12px/1.4 monospace;padding:8px 10px;border-radius:10px;word-break:break-all"></div>
+<script>
+// 문제 찾기용: 오류가 나면 화면 아래에 빨간 상자로 보여 줌 (캡처해서 보내 주세요)
+(function(){ const box=()=>document.getElementById('errbox'); let n=0;
+  const show=m=>{ const b=box(); if(!b||n>4) return; n++; b.style.display='block'; b.textContent+=(n>1?'\n':'')+'['+n+'] '+m; };
+  addEventListener('error', e=>show((e.message||e.type)+' @'+(e.filename||'').split('/').pop()+':'+e.lineno+':'+e.colno));
+  addEventListener('unhandledrejection', e=>show('promise: '+(e.reason&&e.reason.message||e.reason)));
+})();
+</script>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
@@ -393,7 +402,7 @@ function homeView(){
   </div>
   <div style="text-align:center;margin-top:18px"><button class="link" id="voice">🎤 목소리 녹음 (${vc}개)</button>
     <span class="sub"> · </span><button class="link" id="photo">📷 황금 두더지 얼굴</button></div>
-  <p class="sub" style="text-align:center;margin-top:14px;font-size:11px;color:#adb5bd">버전 10.25-1</p>`);
+  <p class="sub" style="text-align:center;margin-top:14px;font-size:11px;color:#adb5bd">버전 10.25-2</p>`);
   const err = m => $('#err').innerHTML = `<div class="msg err">${m}</div>`;
   $('#name').oninput = e => { ME.name = e.target.value.trim(); saveMe(); };
   document.querySelectorAll('.colors button').forEach(b => b.onclick = () => {
