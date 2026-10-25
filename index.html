@@ -402,7 +402,7 @@ function homeView(){
   </div>
   <div style="text-align:center;margin-top:18px"><button class="link" id="voice">🎤 목소리 녹음 (${vc}개)</button>
     <span class="sub"> · </span><button class="link" id="photo">📷 황금 두더지 얼굴</button></div>
-  <p class="sub" style="text-align:center;margin-top:14px;font-size:11px;color:#adb5bd">버전 10.25-3</p>`);
+  <p class="sub" style="text-align:center;margin-top:14px;font-size:11px;color:#adb5bd">버전 10.25-4</p>`);
   const err = m => $('#err').innerHTML = `<div class="msg err">${m}</div>`;
   $('#name').oninput = e => { ME.name = e.target.value.trim(); saveMe(); };
   document.querySelectorAll('.colors button').forEach(b => b.onclick = () => {
@@ -493,17 +493,14 @@ function roomView(code){
   }
 
   function startRound(){
-    // 여러 명이 동시에 눌러도 한 번만 시작되도록 (먼저 누른 사람 것만 반영)
-    const expect = (R.data && R.data.round) || 0;
-    const seed = Math.floor(Math.random()*2**31), startAt = now()+3800;
-    DB.transaction(path, cur => {
-      if (cur === null) return null;                    // 아직 서버 값을 못 받음 → Firebase가 실제 값으로 다시 시도
-      if ((cur.round||0) !== expect) return;            // 이미 누가 시작함 → 취소
-      cur.state = 'playing'; cur.round = expect + 1;
-      cur.level = cur.level || 'normal'; cur.playLevel = cur.level;
-      cur.seed = seed; cur.startAt = startAt;
-      return cur;
-    });
+    // 이미 진행 중인 판이 있으면 무시 (두 명이 거의 동시에 눌러도 한 번만 시작)
+    const d = R.data || {};
+    if (d.state === 'playing' && d.startAt && now() - d.startAt < GAME_MS + 1600) return;
+    if (R.starting && Date.now() - R.starting < 3000) return;
+    R.starting = Date.now();
+    // 방 전체를 한 번에 덮어쓰지 않고 필요한 칸만 고침 (Firebase 규칙이 칸 단위라 통째로 쓰면 거부됨)
+    DB.update(path, { state:'playing', round:(d.round||0)+1, level:d.level||'normal', playLevel:d.level||'normal',
+                      seed:Math.floor(Math.random()*2**31), startAt:now()+3800 });
   }
   function leave(){ DB.remove(path+'/players/'+ME.pid); location.hash=''; }
 
@@ -557,8 +554,6 @@ function roomView(code){
   function frame(){
     R.lastFrame = Date.now();
     const el = elapsed(), ov = $('#overlay'), ovt = $('#ovt');
-    if (Number.isNaN(el) && !R.nanShown) { R.nanShown = true; const b = $('#errbox'); if (b) { b.style.display='block';
-      b.textContent = '진단: startAt=' + JSON.stringify(R.data.startAt) + ' (' + typeof R.data.startAt + ') offset=' + JSON.stringify(DB.offset) + ' now=' + Date.now() + ' state=' + R.data.state + ' round=' + R.data.round + ' seed=' + R.data.seed + ' keys=' + Object.keys(R.data).join(','); } }
     // 카운트다운
     if (el < 0) {
       const n = Math.min(3, Math.ceil(-el/1000));
