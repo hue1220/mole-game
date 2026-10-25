@@ -393,7 +393,7 @@ function homeView(){
   </div>
   <div style="text-align:center;margin-top:18px"><button class="link" id="voice">🎤 목소리 녹음 (${vc}개)</button>
     <span class="sub"> · </span><button class="link" id="photo">📷 황금 두더지 얼굴</button></div>
-  <p class="sub" style="text-align:center;margin-top:14px;font-size:11px;color:#adb5bd">버전 10.24-3</p>`);
+  <p class="sub" style="text-align:center;margin-top:14px;font-size:11px;color:#adb5bd">버전 10.25-1</p>`);
   const err = m => $('#err').innerHTML = `<div class="msg err">${m}</div>`;
   $('#name').oninput = e => { ME.name = e.target.value.trim(); saveMe(); };
   document.querySelectorAll('.colors button').forEach(b => b.onclick = () => {
@@ -525,7 +525,8 @@ function roomView(code){
   function game(){
     const d = R.data;
     R.round = d.round; R.seed = d.seed; R.ev = makeSchedule(d.seed, d.playLevel);
-    P.current = P.list.length ? P.list[d.seed % P.list.length].img : null;   // 판마다 얼굴 하나 (모두 같은 얼굴) R.hits = new Map(); R.score = 0; R.lastCount = null; R.ended = false;
+    P.current = P.list.length ? P.list[d.seed % P.list.length].img : null;   // 판마다 얼굴 하나 (모두 같은 얼굴)
+    R.hits = new Map(); R.score = 0; R.lastCount = null; R.ended = false;   // 새 판: 점수·맞힌 기록 초기화
     R.byHole = Array.from({length:9}, () => []);
     R.ev.forEach((e,i) => R.byHole[e.h].push(i));
     DB.update(path+'/players/'+ME.pid, { score:0, round:d.round });
