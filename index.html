@@ -402,7 +402,7 @@ function homeView(){
   </div>
   <div style="text-align:center;margin-top:18px"><button class="link" id="voice">🎤 목소리 녹음 (${vc}개)</button>
     <span class="sub"> · </span><button class="link" id="photo">📷 황금 두더지 얼굴</button></div>
-  <p class="sub" style="text-align:center;margin-top:14px;font-size:11px;color:#adb5bd">버전 10.25-2</p>`);
+  <p class="sub" style="text-align:center;margin-top:14px;font-size:11px;color:#adb5bd">버전 10.25-3</p>`);
   const err = m => $('#err').innerHTML = `<div class="msg err">${m}</div>`;
   $('#name').oninput = e => { ME.name = e.target.value.trim(); saveMe(); };
   document.querySelectorAll('.colors button').forEach(b => b.onclick = () => {
@@ -557,6 +557,8 @@ function roomView(code){
   function frame(){
     R.lastFrame = Date.now();
     const el = elapsed(), ov = $('#overlay'), ovt = $('#ovt');
+    if (Number.isNaN(el) && !R.nanShown) { R.nanShown = true; const b = $('#errbox'); if (b) { b.style.display='block';
+      b.textContent = '진단: startAt=' + JSON.stringify(R.data.startAt) + ' (' + typeof R.data.startAt + ') offset=' + JSON.stringify(DB.offset) + ' now=' + Date.now() + ' state=' + R.data.state + ' round=' + R.data.round + ' seed=' + R.data.seed + ' keys=' + Object.keys(R.data).join(','); } }
     // 카운트다운
     if (el < 0) {
       const n = Math.min(3, Math.ceil(-el/1000));
