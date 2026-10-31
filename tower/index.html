@@ -167,14 +167,14 @@ const firebaseConfig = {
   projectId: "mole-game-f6eec",
   appId: "1:23804963522:web:ecc7d09c6b52d2dbeea95b"
 };
-const VERSION = '10.31-3';
+const VERSION = '10.31-4';
 const ROOT = 'rooms/';            // 두더지는 3자리, 단어탑은 4자리 방 번호라 겹치지 않음
 const ROUNDS = 7;
 const SEC = 12;                   // 주제마다 생각할 시간
 const COUNTDOWN = 3600;           // 시작 전 3·2·1
 const GRACE = 700;                // 시간 끝난 뒤 마지막 글자 전송 여유
 const REVIEW_FAST = 3800;         // 투표할 단어가 없을 때 결과 보기 시간
-const REVIEW_VOTE = 10000;        // 투표할 단어가 있을 때
+const REVIEW_VOTE = 8000;         // 투표할 단어가 있을 때
 const RECENT_MAX = 84;            // 최근에 나온 주제는 이만큼 쉬었다가 다시 나옴
 const COLORS = ['#ff6b6b','#ff922b','#f5b700','#40c057','#228be6','#7950f2','#e64980','#15aabf'];
 
@@ -224,13 +224,16 @@ function rememberTopics(list){
 const norm = w => String(w || '').replace(/\s+/g,'');
 // 반환: {status:'ok'|'vote'|'bad'|'dup'|'none', why}
 function check(word, topic){
-  const w = norm(word);
+  let w = norm(word), late = false;
+  if (w.startsWith('~')) { late = true; w = w.slice(1); }   // 시간 끝날 때까지 치고 있던 말
   if (!w) return { status:'none', why:'안 적음' };
   if (!/^[가-힣]+$/.test(w)) return { status:'bad', why:'완성된 한글만' };
   const T = TOPICS.get(topic) || { words:new Set(), rule:null };
   if (T.rule && !fitsRule(w, T.rule)) return { status:'bad', why: T.rule.start ? `'${T.rule.start}'로 시작 안 함` : `'${T.rule.end}'로 안 끝남` };
+  if (late) return { status:'bad', why:'치다 말았어요' };
   if (T.words.has(w)) return { status:'ok', why:'정답 목록' };
   if (w.length >= 2 && new Set(w).size === 1) return { status:'bad', why:'같은 글자 반복' };
+  for (const x of T.words) if (x.length > w.length && x.startsWith(w)) return { status:'bad', why:`치다 말았어요 (${x}?)` };
   const tt = norm(topic.replace(/'.'(으로|로) (시작|끝나)는/,''));
   if (w.length >= 2 && tt.includes(w)) return { status:'bad', why:'주제에 있는 말' };
   return { status:'vote', why:'목록에 없음' };
@@ -367,7 +370,7 @@ function homeView(){
     <div>① 주제가 나오면 <b>12초</b> 안에 맞는 낱말을 한글로 적어요.</div>
     <div>② <b>글자 수만큼 블록</b>이 쌓여요. 명왕성 → 블록 3개!</div>
     <div>③ 다른 사람과 <b>같은 낱말</b>이면 둘 다 0개.</div>
-    <div>④ 정답 목록에 없는 낱말은 <b>가족 투표</b>로 정해요. 👍가 👎보다 많아야 인정, 아니면 와르르!</div>
+    <div>④ 정답 목록에 없는 낱말도 인정돼요. 단, 가족이 👎를 눌러 👎가 더 많으면 와르르! 혼자 할 때는 목록 낱말만 인정돼요.</div>
     <div>⑤ 주제 7개가 끝나면 <b>가장 높은 탑</b>이 이겨요.</div></div></div>
   <p class="ver">버전 ${VERSION} · 주제 ${TOPICS.size}개</p>`);
   const err = m => $('#err').innerHTML = `<div class="msg err">${m}</div>`;
@@ -434,7 +437,8 @@ function roomView(code){
       const v = votes[pid] || {}; let up=0, down=0;
       for (const k in v) { if (k===pid) continue; if (v[k] > 0) up++; else if (v[k] < 0) down++; }
       r.up=up; r.down=down; r.need = voters.filter(x=>x!==pid).length; r.myVote = v[ME.pid] || 0;
-      r.pass = up > down;   // 👍가 더 많아야 인정 (아무도 안 누르면 무너짐)
+      r.solo = r.need === 0;
+      r.pass = r.need > 0 ? down <= up : false;   // 기본 인정, 👎가 더 많으면 무너짐. 혼자서는 목록 낱말만
     }
     for (const pid in res) {
       const r = res[pid];
@@ -532,7 +536,7 @@ function roomView(code){
   }
   // 입력칸은 주제마다 새로 만듦 (아이폰에서 읽기 전용 칸을 누르면 자판이 굳는 문제 때문)
   function wireInput(inp){
-    inp.addEventListener('input', () => queueSend(false));
+    inp.addEventListener('input', () => { R.lastKey = now(); queueSend(false); });
     inp.addEventListener('compositionend', () => queueSend(false));
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); queueSend(true); } });
   }
@@ -552,7 +556,8 @@ function roomView(code){
     const go = () => {
       const d2 = R.d; if (!d2 || d2.phase !== 'input' || now() > d2.until + GRACE - 100) return;
       const el = $('#word'); if (!el) return;
-      const v = el.value.trim().slice(0,12);
+      let v = el.value.trim().slice(0,12);
+      if (v && now_ && now() >= d2.until && d2.until - (R.lastKey || 0) < 500) v = '~' + v;   // 끝나는 순간까지 치고 있었음
       const k = d2.game+'-'+d2.ri+'-'+v;
       if (k === R.lastSent) return;
       R.lastSent = k;
@@ -594,7 +599,7 @@ function roomView(code){
     if (d.phase === 'input' && !inp) inp = freshInput();
 
     // 답 상태 안내
-    const myAns = norm(ansOf(ri)[ME.pid]);
+    const myAns = norm(ansOf(ri)[ME.pid]).replace(/^~/,'');
     if (d.phase === 'input') {
       const h = $('#hint');
       if (myAns) { h.textContent = `보냈어요 ✓ ${myAns} · 블록 ${myAns.length}개 (시간 안에 고칠 수 있어요)`; h.className='hint ok'; }
@@ -611,7 +616,7 @@ function roomView(code){
     const cols = rs.map(p => {
       const base = (tot[p.pid] || { n:0, words:[] });
       let extra = [];
-      if (d.phase === 'input') { const w = norm(curAns[p.pid]); extra = [...w].map(ch => ({ ch: p.pid===ME.pid ? ch : '?', cls:'ghost' })); }
+      if (d.phase === 'input') { const w = norm(curAns[p.pid]).replace(/^~/,''); extra = [...w].map(ch => ({ ch: p.pid===ME.pid ? ch : '?', cls:'ghost' })); }
       else if (d.phase === 'review') {
         const r = curRes[p.pid] || {}; const w = r.word || '';
         const first = R.reviewKey !== key;
@@ -653,7 +658,7 @@ function roomView(code){
         const r = curRes[p.pid] || { status:'none' };
         let st;
         if (r.status==='ok') st = `<span class="st ok">✅ +${r.word.length}</span>`;
-        else if (r.status==='vote') st = `<span class="st vote">🤔 👍${r.up} 👎${r.down}</span>`;
+        else if (r.status==='vote') st = r.solo ? `<span class="st bad">🙅 목록에 없음</span>` : `<span class="st ${r.pass?'ok':'bad'}">${r.pass?'🙆':'💥'} 👍${r.up} 👎${r.down}</span>`;
         else if (r.status==='dup') st = `<span class="st bad">👯 같은 낱말 0</span>`;
         else if (r.status==='bad') st = `<span class="st bad">❌ ${esc(r.why)}</span>`;
         else st = `<span class="st bad">⏰ 못 적음</span>`;
@@ -662,7 +667,7 @@ function roomView(code){
         return `<div class="rv" style="--c:${esc(p.color)}"><span class="dot"></span><span class="nm">${esc(p.name)}</span><span class="w">${esc(r.word||'—')}</span>${st}${vbtn}</div>`;
       }).join('');
       const anyVote = rs.some(p => (curRes[p.pid]||{}).status==='vote');
-      below.innerHTML = `<div class="review">${rows}</div><p class="sub" style="text-align:center;margin-top:6px;font-size:13px">${anyVote?'🤔 목록에 없는 낱말이에요. 맞으면 👍, 아니면 👎! · ':''}<span id="nextin"></span></p>`;
+      below.innerHTML = `<div class="review">${rows}</div><p class="sub" style="text-align:center;margin-top:6px;font-size:13px">${anyVote?'🤔 목록에 없는 낱말은 일단 인정! 아니다 싶으면 👎를 눌러요 · ':''}<span id="nextin"></span></p>`;
       below.querySelectorAll('.vb').forEach(b => b.onpointerdown = e => e.preventDefault());
       below.querySelectorAll('.vb').forEach(b => b.onclick = () => {
         const v = +b.dataset.v, cur = ((votesOf(ri)[b.dataset.p]||{})[ME.pid]) || 0;
