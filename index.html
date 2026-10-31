@@ -65,6 +65,15 @@ input:focus{border-color:var(--brand)}
 .bigcode{font-size:56px;font-weight:800;letter-spacing:.18em;color:var(--brand);text-align:center;line-height:1.1}
 .plist{display:grid;gap:8px;margin-top:8px}
 .pl{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;background:var(--soft);font-weight:700}
+/* ---- 랭킹 ---- */
+.rk{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--soft);font-weight:700;font-size:15px}
+.rk.me{background:#fff;box-shadow:0 0 0 2px var(--c)}
+.rk.top1{background:#fff8dc}.rk.top2{background:#f3f4f6}.rk.top3{background:#fdf1e7}
+.rk .no{width:30px;text-align:center;font-size:17px;font-weight:900;color:var(--sub)}
+.rk .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rk .sc{font-size:18px;font-weight:900;font-variant-numeric:tabular-nums}
+.rk .dt{font-size:12px;color:var(--sub);font-weight:600;width:44px;text-align:right}
+.newrec{margin-top:12px;padding:12px 14px;border-radius:14px;background:#fff8dc;color:#8a5a00;font-weight:800;text-align:center;font-size:15px}
 .dot{width:16px;height:16px;border-radius:50%;background:var(--c);flex:none}
 .me{font-size:12px;color:var(--sub);font-weight:600}
 
@@ -451,11 +460,37 @@ const header = (right='') => `<div class="top"><div class="brand">${ICON}뿅뿅 
 let cleanups = [];
 function reset(){ cleanups.forEach(f=>f()); cleanups=[]; V.onchange=null; $('#overlay').classList.add('hide'); }
 
+/* ---------- 최고 기록 랭킹 (난이도별 상위 10) ---------- */
+const RANK = 'rooms/ranking/';   // 방과 같은 규칙으로 저장되는 자리
+function rankList(v){
+  return Object.entries(v || {}).map(([id,r]) => ({ id, ...r }))
+    .filter(r => r && typeof r.score === 'number')
+    .sort((a,b) => (b.score - a.score) || ((a.at||0) - (b.at||0))).slice(0,10);
+}
+function rankHTML(list, myId){
+  if (!list.length) return `<p class="sub" style="text-align:center;padding:10px 0">아직 기록이 없어요. 첫 기록의 주인공이 되어 보세요!</p>`;
+  const dt = t => { const d = new Date(t||0); return (d.getMonth()+1)+'/'+d.getDate(); };
+  return list.map((r,i) => `<div class="rk ${r.id===myId?'me':''} ${i<3?'top'+(i+1):''}" style="--c:${esc(r.color||'#999')}">
+    <span class="no">${['🥇','🥈','🥉'][i] || (i+1)}</span><span class="dot" style="background:${esc(r.color||'#999')}"></span>
+    <span class="nm">${esc(r.name||'?')}</span><span class="sc">${r.score}점</span><span class="dt">${dt(r.at)}</span></div>`).join('');
+}
+function rankView(level, room){
+  if (!LEVELS[level]) level = 'normal';
+  paint(`${header(`<button class="link" id="back">${room ? '방으로' : '처음으로'}</button>`)}
+    <h1 style="text-align:center;margin-top:6px">🏆 최고 기록</h1><p class="sub" style="text-align:center">난이도별로 역대 높은 점수 10개</p>
+    <div class="card"><div class="seg">${Object.entries(LEVELS).map(([k,L])=>`<button data-lv="${k}" class="${k===level?'on':''}">${L.emoji} ${L.name}</button>`).join('')}</div>
+      <div class="plist" id="ranklist" style="margin-top:14px"><p class="sub">불러오는 중…</p></div></div>`);
+  $('#back').onclick = () => location.hash = room ? 'r='+room : '';
+  document.querySelectorAll('[data-lv]').forEach(b => b.onclick = () => location.hash = 'k='+b.dataset.lv + (room ? '&r='+room : ''));
+  cleanups.push(DB.on(RANK+level, v => { const el = $('#ranklist'); if (el) el.innerHTML = rankHTML(rankList(v), null); }));
+}
+
 function route(){
   reset();
   const h = new URLSearchParams(location.hash.slice(1));
   if (h.get('v') !== null) return lockGate('목소리 녹음', h.get('r'), note => voiceView(h.get('r'), note));
   if (h.get('p') !== null) return lockGate('황금 두더지 얼굴', h.get('r'), note => photoView(h.get('r'), note));
+  if (h.get('k') !== null) return rankView(h.get('k') || 'normal', h.get('r'));
   if (h.get('r')) return roomView(h.get('r'));
   homeView();
 }
@@ -477,15 +512,17 @@ function homeView(){
     <label class="f">가족이 만든 방에 들어가기</label>
     <div class="row"><input id="rcode" class="code-in" inputmode="numeric" maxlength="3" placeholder="000"><button class="btn ghost small" id="join" style="flex:none;padding:16px 18px">입장</button></div>
   </div>
+  <div style="height:12px"></div><button class="btn ghost" id="rank">🏆 최고 기록 랭킹</button>
   <div style="text-align:center;margin-top:18px"><button class="link" id="voice">🔒 🎤 목소리 녹음 (${vc}개)</button>
     <span class="sub"> · </span><button class="link" id="photo">🔒 📷 황금 두더지 얼굴</button></div>
-  <p class="sub" style="text-align:center;margin-top:14px;font-size:11px;color:#adb5bd">버전 10.31-1</p>`);
+  <p class="sub" style="text-align:center;margin-top:14px;font-size:11px;color:#adb5bd">버전 10.31-2</p>`);
   const err = m => $('#err').innerHTML = `<div class="msg err">${m}</div>`;
   $('#name').oninput = e => { ME.name = e.target.value.trim(); saveMe(); };
   document.querySelectorAll('.colors button').forEach(b => b.onclick = () => {
     ME.color = b.dataset.c; saveMe(); document.querySelectorAll('.colors button').forEach(x => x.classList.toggle('on', x===b)); });
   $('#rcode').oninput = e => e.target.value = e.target.value.replace(/\D/g,'').slice(0,3);
   $('#voice').onclick = () => location.hash = 'v';
+  $('#rank').onclick = () => location.hash = 'k=normal';
   $('#photo').onclick = () => location.hash = 'p';
   $('#make').onclick = async () => {
     if (!ME.name) return err('이름을 먼저 적어주세요.');
@@ -698,7 +735,7 @@ function roomView(code){
   /* --- 결과 --- */
   function result(){
     $('#overlay').classList.add('hide');
-    const d = R.data;
+    const d = R.data, lv = d.playLevel || 'normal';
     const ps = players().filter(p => p.round === d.round).sort((a,b) => (b.score||0) - (a.score||0));
     const medals = ['🥇','🥈','🥉'], heights = [150,110,80];
     const order = ps.length >= 3 ? [1,0,2] : ps.length === 2 ? [1,0] : [0];
@@ -708,10 +745,28 @@ function roomView(code){
         <div class="medal">${medals[i]}</div><div class="nm">${esc(ps[i].name)}</div><div class="sc">${ps[i].score||0}점</div>
         <div class="bar" style="height:${heights[i]}px">${i+1}</div></div>`).join('')}</div>
       ${ps.length > 3 ? `<div class="card"><div class="plist">${ps.slice(3).map((p,k)=>`<div class="pl" style="--c:${p.color}"><span class="dot"></span>${k+4}등 ${esc(p.name)} <span style="margin-left:auto">${p.score||0}점</span></div>`).join('')}</div></div>` : ''}
-      <div style="height:20px"></div>
+      <div id="newrec"></div>
+      <div class="card"><h2>🏆 ${LEVELS[lv].emoji} ${LEVELS[lv].name} 최고 기록 10</h2><div class="plist" id="ranklist"><p class="sub">불러오는 중…</p></div></div>
+      <div style="height:16px"></div>
       <button class="btn" id="again">한 판 더! (같은 난이도)</button>
       <div style="height:10px"></div><button class="btn ghost" id="lobby">난이도 바꾸기</button>
       <div style="text-align:center;margin-top:16px"><button class="link" id="voice">🔒 🎤 목소리 녹음</button></div>`);
+    // 내 기록 저장 (한 판에 한 번만)
+    const me = ps.find(p => p.pid === ME.pid);
+    const rkey = code+'-'+d.round;
+    if (me && (me.score||0) > 0 && R.rankSaved !== rkey) {
+      R.rankSaved = rkey;
+      DB.set(RANK+lv+'/'+rkey+'-'+ME.pid, { name:ME.name, color:ME.color, score:me.score, at:now(), pid:ME.pid }).catch(e => window.__showErr && __showErr('기록 저장 실패: '+e.message));
+    }
+    if (R.rankOff) R.rankOff();
+    R.rankOff = DB.on(RANK+lv, v => {
+      const list = rankList(v), el = $('#ranklist'), nr = $('#newrec');
+      if (!el || !nr || R.view !== 'result') return;
+      el.innerHTML = rankHTML(list, rkey+'-'+ME.pid);
+      const i = list.findIndex(r => r.id === rkey+'-'+ME.pid);
+      nr.innerHTML = i >= 0 ? `<div class="newrec">🏆 ${esc(ME.name)} ${i+1}위 기록! (${me.score}점)</div>` : '';
+    });
+    cleanups.push(() => { if (R.rankOff) R.rankOff(); R.rankOff = null; });
     $('#again').onclick = startRound;
     $('#lobby').onclick = () => DB.update(path, { state:'lobby' });
     $('#out').onclick = leave;
