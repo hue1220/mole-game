@@ -119,6 +119,18 @@ input:focus{border-color:var(--brand)}
 .vi{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:14px;background:var(--soft);font-weight:700}
 .vi span{flex:1}
 .vi small{color:var(--sub);font-weight:500;font-size:12px}
+/* ---- 잠금 ---- */
+.lockwrap{text-align:center;margin-top:14px}
+.lockico{font-size:46px;line-height:1}
+.pindots{display:flex;justify-content:center;gap:16px;margin:18px 0 6px}
+.pindots i{width:18px;height:18px;border-radius:50%;border:2.5px solid var(--brand);display:block}
+.pindots i.on{background:var(--brand)}
+.pindots.shake{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:300px;margin:16px auto 0}
+.pad button{height:62px;border:0;border-radius:18px;background:var(--soft);font:inherit;font-size:26px;font-weight:800;color:inherit;cursor:pointer}
+.pad button:active{transform:scale(.96)}
+.pad button.blank{visibility:hidden}
 </style>
 </head>
 <body>
@@ -253,13 +265,77 @@ const SFX = {
   end(){ [784,659,523].forEach((f,i)=>tone('triangle',f,f,0.22,0.22,i*0.14)); }
 };
 
+/* ---------- 🔒 목소리·사진 잠금 (4자리 비밀번호, 들어갈 때마다 물어봄) ---------- */
+const LOCK = { v:null, p:null, vLoaded:false, pLoaded:false, onchange:null,
+  get rec(){ return this.v || this.p; }, get ready(){ return this.vLoaded && this.pLoaded; },
+  changed(){ if (this.onchange) this.onchange(); } };
+async function pinHash(pin, salt){
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('mole|' + salt + '|' + pin));
+  return [...new Uint8Array(d)].map(b => b.toString(16).padStart(2,'0')).join('');
+}
+async function saveLock(pin){
+  const salt = rid(12), rec = { lock:true, salt, h: await pinHash(pin, salt), at: now(), wav:'', img:'', kind:'lock' };
+  const paths = LOCK.p && !LOCK.v ? ['photos/faces/_lock', 'voices/_lock'] : ['voices/_lock', 'photos/faces/_lock'];
+  for (const path of paths) { try { await DB.set(path, rec); return true; } catch(e) {} }
+  return false;
+}
+const PINFAIL = { n:0, until:0 };
+// mode: 'auto'(있으면 입력, 없으면 새로 정하기) | 'change'(새 비밀번호로 바꾸기)
+function lockGate(title, back, onOpen, mode='auto'){
+  let step = null, pin = '', first = '', msg = '', shake = false, busy = false;
+  function draw(){
+    if (!LOCK.ready) { paint(`${header(`<button class="link" id="back">← 돌아가기</button>`)}<div class="lockwrap"><div class="lockico">🔒</div><p class="sub">잠깐만요, 불러오는 중…</p></div>`);
+      $('#back').onclick = () => location.hash = back ? 'r='+back : ''; return; }
+    if (!step) step = (mode === 'change' || !LOCK.rec) ? 'new' : 'enter';
+    const t = step === 'enter' ? '비밀번호 4자리를 눌러 주세요'
+      : step === 'new' ? (mode === 'change' ? '새 비밀번호 4자리를 정해 주세요' : '처음이에요! 가족 비밀번호 4자리를 정해 주세요')
+      : '확인을 위해 한 번 더 눌러 주세요';
+    const keys = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
+    paint(`${header(`<button class="link" id="back">← 돌아가기</button>`)}
+      <div class="lockwrap"><div class="lockico">🔒</div><h1 style="margin-top:8px">${esc(title)}</h1><p class="sub">${t}</p>
+      <div class="pindots ${shake?'shake':''}">${[0,1,2,3].map(i=>`<i class="${i<pin.length?'on':''}"></i>`).join('')}</div>
+      ${msg ? `<div class="msg ${msg.startsWith('!')?'err':'info'}">${esc(msg.replace(/^!/,''))}</div>` : ''}
+      <div class="pad">${keys.map(k=>`<button data-k="${k}" class="${k===''?'blank':''}">${k}</button>`).join('')}</div>
+      <p class="sub" style="margin-top:16px;font-size:12px">녹음·사진은 가족만 바꿀 수 있어요. 게임은 누구나 할 수 있어요.</p></div>`);
+    shake = false;
+    $('#back').onclick = () => location.hash = back ? 'r='+back : '';
+    document.querySelectorAll('[data-k]').forEach(b => b.onclick = () => press(b.dataset.k));
+  }
+  async function press(k){
+    if (busy || !k) return;
+    if (k === '⌫') { pin = pin.slice(0, -1); return draw(); }
+    if (pin.length >= 4) return;
+    pin += k; draw();
+    if (pin.length < 4) return;
+    busy = true;
+    if (step === 'enter') {
+      if (Date.now() < PINFAIL.until) { msg = `!너무 많이 틀렸어요. ${Math.ceil((PINFAIL.until-Date.now())/1000)}초 뒤에 다시 해 주세요.`; pin=''; shake=true; busy=false; return draw(); }
+      const r = LOCK.rec;
+      if (await pinHash(pin, r.salt) === r.h) { PINFAIL.n = 0; busy=false; return open(); }
+      PINFAIL.n++; if (PINFAIL.n >= 5) { PINFAIL.until = Date.now() + 30000; PINFAIL.n = 0; }
+      msg = '!비밀번호가 달라요.'; pin=''; shake=true; busy=false; return draw();
+    }
+    if (step === 'new') { first = pin; pin = ''; step = 'again'; msg = ''; busy=false; return draw(); }
+    if (pin !== first) { msg = '!두 번 누른 번호가 달라요. 처음부터 다시 정해 주세요.'; pin=''; first=''; step='new'; shake=true; busy=false; return draw(); }
+    const ok = await saveLock(pin); busy = false;
+    if (!ok) { msg = '!비밀번호를 저장하지 못했어요. 인터넷 연결을 확인해 주세요.'; pin=''; first=''; step='new'; return draw(); }
+    open(mode === 'change' ? '비밀번호를 바꿨어요.' : '비밀번호를 정했어요. 다음부터 이 번호로 들어와요.');
+  }
+  function open(note){ LOCK.onchange = null; onOpen(note); }
+  LOCK.onchange = () => { if (!step) draw(); };
+  cleanups.push(() => { LOCK.onchange = null; });
+  draw();
+}
+
 /* ---------- 목소리 (놀리는 소리) ---------- */
 const V = { raw:{}, buf:{}, playing:false, onchange:null };
 function b64ToBytes(b64){ const s=atob(b64), u=new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i); return u; }
 function bytesToB64(u){ let s=''; for(let i=0;i<u.length;i+=0x8000) s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000)); return btoa(s); }
 function decodeAB(ab){ return new Promise((res,rej)=>{ const p=ac().decodeAudioData(ab,res,rej); if(p&&p.then) p.then(res,rej); }); }
 DB.on('voices', v => {
-  V.raw = v || {};
+  v = Object.assign({}, v || {});
+  LOCK.v = (v._lock && v._lock.h) ? v._lock : null; LOCK.vLoaded = true; delete v._lock; LOCK.changed();
+  V.raw = v;
   for (const id of Object.keys(V.buf)) if (!V.raw[id]) delete V.buf[id];
   for (const [id,x] of Object.entries(V.raw)) {
     if (V.buf[id] || !x || !x.wav) continue;
@@ -310,6 +386,7 @@ function toWav(buf){
 const P = { list:[], current:null, onchange:null };   // list: [{id, img, path}]
 DB.on('photos', v => {
   v = v || {}; const list = [];
+  const pl = v.faces && v.faces._lock; LOCK.p = (pl && pl.h) ? pl : null; LOCK.pLoaded = true; LOCK.changed();
   if (v.gold && v.gold.img) list.push({ id:'gold', img:v.gold.img, at:v.gold.at||0, path:'photos/gold' });   // 예전 방식(1장)
   for (const [id,x] of Object.entries(v.faces || {})) if (x && x.img) list.push({ id, img:x.img, at:x.at||0, path:'photos/faces/'+id });
   list.sort((a,b) => a.at - b.at || (a.id < b.id ? -1 : 1));
@@ -377,8 +454,8 @@ function reset(){ cleanups.forEach(f=>f()); cleanups=[]; V.onchange=null; $('#ov
 function route(){
   reset();
   const h = new URLSearchParams(location.hash.slice(1));
-  if (h.get('v') !== null) return voiceView(h.get('r'));
-  if (h.get('p') !== null) return photoView(h.get('r'));
+  if (h.get('v') !== null) return lockGate('목소리 녹음', h.get('r'), note => voiceView(h.get('r'), note));
+  if (h.get('p') !== null) return lockGate('황금 두더지 얼굴', h.get('r'), note => photoView(h.get('r'), note));
   if (h.get('r')) return roomView(h.get('r'));
   homeView();
 }
@@ -400,9 +477,9 @@ function homeView(){
     <label class="f">가족이 만든 방에 들어가기</label>
     <div class="row"><input id="rcode" class="code-in" inputmode="numeric" maxlength="3" placeholder="000"><button class="btn ghost small" id="join" style="flex:none;padding:16px 18px">입장</button></div>
   </div>
-  <div style="text-align:center;margin-top:18px"><button class="link" id="voice">🎤 목소리 녹음 (${vc}개)</button>
-    <span class="sub"> · </span><button class="link" id="photo">📷 황금 두더지 얼굴</button></div>
-  <p class="sub" style="text-align:center;margin-top:14px;font-size:11px;color:#adb5bd">버전 10.25-4</p>`);
+  <div style="text-align:center;margin-top:18px"><button class="link" id="voice">🔒 🎤 목소리 녹음 (${vc}개)</button>
+    <span class="sub"> · </span><button class="link" id="photo">🔒 📷 황금 두더지 얼굴</button></div>
+  <p class="sub" style="text-align:center;margin-top:14px;font-size:11px;color:#adb5bd">버전 10.31-1</p>`);
   const err = m => $('#err').innerHTML = `<div class="msg err">${m}</div>`;
   $('#name').oninput = e => { ME.name = e.target.value.trim(); saveMe(); };
   document.querySelectorAll('.colors button').forEach(b => b.onclick = () => {
@@ -517,8 +594,8 @@ function roomView(code){
         <div class="seg">${Object.entries(LEVELS).map(([k,L])=>`<button data-lv="${k}" class="${k===lv?'on':''}">${L.emoji} ${L.name}</button>`).join('')}</div>
         <div style="height:14px"></div><button class="btn" id="go">시작! (30초 · ${LEVELS[lv].name})</button>
         <p class="sub" style="text-align:center;margin-top:10px">모두 들어오면 아무나 시작을 누르세요</p></div>
-      <div style="text-align:center;margin-top:16px"><button class="link" id="voice">🎤 목소리 ${vc}개 · 녹음하러 가기</button>
-        <span class="sub"> · </span><button class="link" id="photo">📷 황금 두더지 얼굴</button></div>`);
+      <div style="text-align:center;margin-top:16px"><button class="link" id="voice">🔒 🎤 목소리 ${vc}개 · 녹음하러 가기</button>
+        <span class="sub"> · </span><button class="link" id="photo">🔒 📷 황금 두더지 얼굴</button></div>`);
     if (window.QRCode) new QRCode($('#qr'), { text: location.origin + location.pathname, width:150, height:150 });
     $('#go').onclick = startRound;
     $('#out').onclick = leave;
@@ -634,7 +711,7 @@ function roomView(code){
       <div style="height:20px"></div>
       <button class="btn" id="again">한 판 더! (같은 난이도)</button>
       <div style="height:10px"></div><button class="btn ghost" id="lobby">난이도 바꾸기</button>
-      <div style="text-align:center;margin-top:16px"><button class="link" id="voice">🎤 목소리 녹음</button></div>`);
+      <div style="text-align:center;margin-top:16px"><button class="link" id="voice">🔒 🎤 목소리 녹음</button></div>`);
     $('#again').onclick = startRound;
     $('#lobby').onclick = () => DB.update(path, { state:'lobby' });
     $('#out').onclick = leave;
@@ -645,8 +722,8 @@ function roomView(code){
 }
 
 /* ================= 황금 두더지 사진 ================= */
-function photoView(back){
-  let msg = '';
+function photoView(back, note){
+  let msg = note || '';
   function draw(){
     const L = P.list;
     paint(`${header(`<button class="link" id="back">← 돌아가기</button>`)}
@@ -656,7 +733,9 @@ function photoView(back){
         : `<div class="facebox" style="width:160px;height:160px">${moleSVG('mole').replace('<svg','<svg style="filter:sepia(1) saturate(4) hue-rotate(-10deg)"')}</div><p class="sub" style="text-align:center">아직 얼굴이 없어서 원래 황금 두더지가 나와요.</p>`}
       ${msg ? `<div class="msg ${msg.startsWith('!')?'err':'info'}" style="text-align:center">${esc(msg.replace(/^!/,''))}</div>` : ''}
       <label class="btn" style="margin-top:14px">📷 얼굴 사진 추가 (여러 장 선택 가능)<input id="file" type="file" accept="image/*" multiple hidden></label>
-      <p class="sub" style="text-align:center;margin-top:14px">사진은 이 게임 저장소(Firebase)에만 저장돼요. 최대 6장.</p>`);
+      <p class="sub" style="text-align:center;margin-top:14px">사진은 이 게임 저장소(Firebase)에만 저장돼요. 최대 6장.</p>
+      <div style="text-align:center;margin-top:10px"><button class="link" id="chpin">🔑 비밀번호 바꾸기</button></div>`);
+    $('#chpin').onclick = () => { reset(); lockGate('비밀번호 바꾸기', back, n => photoView(back, n), 'change'); };
     $('#back').onclick = () => location.hash = back ? 'r='+back : '';
     $('#file').onchange = async e => {
       const files = [...e.target.files].slice(0, Math.max(0, 6 - P.list.length));
@@ -689,8 +768,8 @@ function photoView(back){
 }
 
 /* ================= 목소리 녹음 ================= */
-function voiceView(back){
-  const S = { rec:null, stream:null, timer:0, msg:'', kind:'tease' };
+function voiceView(back, note){
+  const S = { rec:null, stream:null, timer:0, msg:note||'', kind:'tease' };
   const KINDS = { tease:{ tab:'😜 놀리는 목소리', help:'빈 구멍을 때리면 여기 목소리 중 하나가 나와요.', none:'없으면 기본 "삐융~" 소리가 나요' },
                   gold:{ tab:'👑 황금 두더지 목소리', help:'황금 두더지를 잡으면 여기 목소리 중 하나가 나와요.', none:'없으면 반짝 효과음만 나요' } };
   function draw(){
@@ -705,7 +784,9 @@ function voiceView(back){
       <div class="card"><h2>저장된 목소리 · ${list.length}개</h2>
         ${list.length ? `<div class="vlist">${list.map(([id,x],k)=>`<div class="vi"><span>목소리 ${k+1} <small>${esc(x.by||'')}</small></span>
           <button class="btn ghost small" data-play="${id}">▶ 듣기</button><button class="btn ghost small" data-del="${id}">삭제</button></div>`).join('')}</div>`
-          : `<p class="sub">아직 없어요. 녹음해 보세요! (${K.none})</p>`}</div>`);
+          : `<p class="sub">아직 없어요. 녹음해 보세요! (${K.none})</p>`}</div>
+      <div style="text-align:center;margin-top:10px"><button class="link" id="chpin">🔑 비밀번호 바꾸기</button></div>`);
+    $('#chpin').onclick = () => { if (S.rec) return; stop(true); reset(); lockGate('비밀번호 바꾸기', back, n => voiceView(back, n), 'change'); };
     document.querySelectorAll('[data-kind]').forEach(b => b.onclick = () => { if (S.rec) return; S.kind = b.dataset.kind; S.msg=''; draw(); });
     $('#back').onclick = () => { stop(true); location.hash = back ? 'r='+back : ''; };
     $('#rec').onclick = () => S.rec ? stop() : start();
