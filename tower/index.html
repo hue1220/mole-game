@@ -105,6 +105,7 @@ input:focus{border-color:var(--brand)}
 .crown{font-size:16px;line-height:1;height:18px}
 .inbox{margin-top:8px}
 .inbox .row input{font-size:22px;font-weight:800;text-align:center;padding:12px}
+.inbox .wait{font-size:17px;font-weight:700;text-align:center;padding:14px;border:1.5px dashed var(--line);border-radius:14px;color:var(--sub);background:var(--soft)}
 .inbox .hint{font-size:13px;color:var(--sub);text-align:center;margin-top:6px;min-height:20px;font-weight:600}
 .inbox .hint.ok{color:var(--ok)}
 .review{margin-top:8px;display:grid;gap:6px;max-height:34dvh;overflow:auto}
@@ -166,7 +167,7 @@ const firebaseConfig = {
   projectId: "mole-game-f6eec",
   appId: "1:23804963522:web:ecc7d09c6b52d2dbeea95b"
 };
-const VERSION = '10.31-2';
+const VERSION = '10.31-3';
 const ROOT = 'rooms/';            // 두더지는 3자리, 단어탑은 4자리 방 번호라 겹치지 않음
 const ROUNDS = 7;
 const SEC = 12;                   // 주제마다 생각할 시간
@@ -527,17 +528,31 @@ function roomView(code){
       <div id="below"></div>
     </div>`);
     $('#mute').onclick = () => { MUTE=!MUTE; LS.set('tower-mute',MUTE); $('#mute').textContent = MUTE?'🔇':'🔊'; };
-    const inp = $('#word');
+    wireInput($('#word'));
+  }
+  // 입력칸은 주제마다 새로 만듦 (아이폰에서 읽기 전용 칸을 누르면 자판이 굳는 문제 때문)
+  function wireInput(inp){
     inp.addEventListener('input', () => queueSend(false));
     inp.addEventListener('compositionend', () => queueSend(false));
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); queueSend(true); } });
+  }
+  function freshInput(){
+    const row = $('#inbox .row'); if (!row) return null;
+    row.innerHTML = '<input id="word" maxlength="12" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" placeholder="여기에 낱말을 적어요">';
+    const inp = $('#word'); wireInput(inp); return inp;
+  }
+  function waitBox(text){
+    const row = $('#inbox .row'); if (!row) return;
+    const old = $('#word'); if (old) { try { old.blur(); } catch(e){} }
+    row.innerHTML = `<div class="wait">${esc(text)}</div>`;   // 입력칸 자체를 없애서 눌러도 아무 일 없게
   }
   function queueSend(now_){
     const d = R.d; if (!d || d.phase !== 'input') return;
     clearTimeout(R.saveT);
     const go = () => {
       const d2 = R.d; if (!d2 || d2.phase !== 'input' || now() > d2.until + GRACE - 100) return;
-      const v = $('#word').value.trim().slice(0,12);
+      const el = $('#word'); if (!el) return;
+      const v = el.value.trim().slice(0,12);
       const k = d2.game+'-'+d2.ri+'-'+v;
       if (k === R.lastSent) return;
       R.lastSent = k;
@@ -554,7 +569,7 @@ function roomView(code){
       $('#tbar').style.transform = `scaleX(${left/(sec*1000)})`; $('#tb').classList.toggle('low', s<=3);
       const tk = d.game+'-'+d.ri+'-'+s;
       if (s<=3 && s>0 && !R.sounded[tk]) { R.sounded[tk]=1; SFX.tick(); }
-      if (left <= 0) { $('#word').readOnly = true; const k='e'+d.game+'-'+d.ri; if(!R.sounded[k]){R.sounded[k]=1; SFX.end(); queueSend(true);} }
+      if (left <= 0) { const k='e'+d.game+'-'+d.ri; if(!R.sounded[k]){R.sounded[k]=1; SFX.end(); queueSend(true);} }
     } else if (d.phase === 'review') {
       $('#secs').textContent = ''; $('#tbar').style.transform = `scaleX(0)`;
       const left = Math.max(0, Math.ceil((d.until - t)/1000)), el = $('#nextin');
@@ -562,7 +577,8 @@ function roomView(code){
     } else { $('#secs').textContent = sec; $('#tbar').style.transform='scaleX(1)'; }
   }
   function updateGame(){
-    const d = R.d, ri = d.ri || 0, topic = (d.topics||[])[ri] || '', inp = $('#word');
+    const d = R.d, ri = d.ri || 0, topic = (d.topics||[])[ri] || '';
+    let inp = $('#word');
     const key = d.game+'-'+ri+'-'+d.phase;
     const isNewPhase = key !== R.prevKey; R.prevKey = key;
     $('#rno').textContent = d.phase === 'count' ? '준비!' : `주제 ${ri+1} / ${ROUNDS}`;
@@ -570,12 +586,12 @@ function roomView(code){
     else { $('#lab').textContent = d.phase==='review' ? '결과 확인' : '주제'; if ($('#tt').textContent !== topic) { $('#tt').textContent = topic; $('#topic').classList.remove('pop'); void $('#topic').offsetWidth; $('#topic').classList.add('pop'); } }
 
     if (isNewPhase && d.phase === 'input') {
-      inp.value = ''; inp.readOnly = false; R.lastSent = null; $('#hint').textContent=''; $('#hint').className='hint';
-      try { inp.focus({ preventScroll:true }); } catch(e){}
+      inp = freshInput(); R.lastSent = null; $('#hint').textContent=''; $('#hint').className='hint';
+      try { inp && inp.focus({ preventScroll:true }); } catch(e){}
       SFX.topic();
     }
-    if (isNewPhase && d.phase === 'review') { inp.readOnly = true; inp.value = ''; try { inp.blur(); } catch(e){} }   // 자판 내리기
-    if (d.phase !== 'input') inp.readOnly = true;
+    if (isNewPhase && d.phase !== 'input') waitBox(d.phase === 'review' ? '결과 확인 중… 다음 주제를 기다려요' : '곧 시작해요');
+    if (d.phase === 'input' && !inp) inp = freshInput();
 
     // 답 상태 안내
     const myAns = norm(ansOf(ri)[ME.pid]);
@@ -652,7 +668,6 @@ function roomView(code){
         const v = +b.dataset.v, cur = ((votesOf(ri)[b.dataset.p]||{})[ME.pid]) || 0;
         DB.set(`${path}/vote/r${ri}/${b.dataset.p}/${ME.pid}`, cur === v ? null : v);
       });
-      inp.placeholder = '결과 확인 중… 다음 주제를 기다려요';
       if (isNewPhase) {
         const fell = rs.some(p => ['bad','dup'].includes((curRes[p.pid]||{}).status));
         if (fell) setTimeout(SFX.fall, 200);
@@ -665,7 +680,6 @@ function roomView(code){
     } else {
       below.innerHTML = '';
       $('#inbox').style.display = d.phase==='count' ? 'none' : '';
-      inp.placeholder = '여기에 낱말을 적어요';
     }
     updateClock();
   }
