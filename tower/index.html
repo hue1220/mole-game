@@ -63,6 +63,15 @@ input:focus{border-color:var(--brand)}
 .seg button.on{background:#fff;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.1)}
 .bigcode{font-size:56px;font-weight:800;letter-spacing:.16em;color:var(--brand);text-align:center;line-height:1.1}
 .plist{display:grid;gap:8px;margin-top:8px}
+/* ---- 랭킹 ---- */
+.rk{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--soft);font-weight:700;font-size:15px}
+.rk.me{background:#fff;box-shadow:0 0 0 2px var(--c)}
+.rk.top1{background:#fff8dc}.rk.top2{background:#f3f4f6}.rk.top3{background:#fdf1e7}
+.rk .no{width:30px;text-align:center;font-size:17px;font-weight:900;color:var(--sub)}
+.rk .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rk .sc{font-size:18px;font-weight:900;font-variant-numeric:tabular-nums}
+.rk .dt{font-size:12px;color:var(--sub);font-weight:600;width:44px;text-align:right}
+.newrec{margin-top:12px;padding:12px 14px;border-radius:14px;background:#fff8dc;color:#8a5a00;font-weight:800;text-align:center;font-size:15px}
 .pl{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;background:var(--soft);font-weight:700}
 .dot{width:16px;height:16px;border-radius:5px;background:var(--c);flex:none}
 .me{font-size:12px;color:var(--sub);font-weight:600}
@@ -168,7 +177,7 @@ const firebaseConfig = {
   projectId: "mole-game-f6eec",
   appId: "1:23804963522:web:ecc7d09c6b52d2dbeea95b"
 };
-const VERSION = '10.31-5';
+const VERSION = '11.01-1';
 const ROOT = 'rooms/';            // 두더지는 3자리, 단어탑은 4자리 방 번호라 겹치지 않음
 const ROUNDS = 7;
 const SEC = 12;                   // 주제마다 생각할 시간
@@ -346,9 +355,32 @@ let cleanups = [];
 function reset(){ cleanups.forEach(f=>{ try{f();}catch(e){} }); cleanups=[]; overlay(null); }
 function overlay(big, small=''){ const o=$('#overlay'); if (!big) return o.classList.add('hide'); $('#ovt').textContent=big; $('#ovs').textContent=small; o.classList.remove('hide'); }
 
+/* ---------- 최고 기록 랭킹 (상위 10, 층 수) ---------- */
+const RANK = 'rooms/ranking/tower';   // 두더지 랭킹(rooms/ranking/<난이도>)과 같은 자리, 다른 이름
+function rankList(v){
+  return Object.entries(v || {}).map(([id,r]) => ({ id, ...r }))
+    .filter(r => r && typeof r.score === 'number')
+    .sort((a,b) => (b.score - a.score) || ((a.at||0) - (b.at||0))).slice(0,10);
+}
+function rankHTML(list, myId){
+  if (!list.length) return `<p class="sub" style="text-align:center;padding:10px 0">아직 기록이 없어요. 첫 기록의 주인공이 되어 보세요!</p>`;
+  const dt = t => { const d = new Date(t||0); return (d.getMonth()+1)+'/'+d.getDate(); };
+  return list.map((r,i) => `<div class="rk ${r.id===myId?'me':''} ${i<3?'top'+(i+1):''}" style="--c:${esc(r.color||'#999')}">
+    <span class="no">${['🥇','🥈','🥉'][i] || (i+1)}</span><span class="dot" style="--c:${esc(r.color||'#999')}"></span>
+    <span class="nm">${esc(r.name||'?')}</span><span class="sc">${r.score}층</span><span class="dt">${dt(r.at)}</span></div>`).join('');
+}
+function rankView(room){
+  paint(`${header(`<button class="link" id="back">${room ? '방으로' : '처음으로'}</button>`)}
+    <h1 style="text-align:center;margin-top:6px">🏆 최고 기록</h1><p class="sub" style="text-align:center">역대 가장 높이 쌓은 탑 10개</p>
+    <div class="card"><div class="plist" id="ranklist" style="margin-top:0"><p class="sub">불러오는 중…</p></div></div>`);
+  $('#back').onclick = () => location.hash = room ? 'r='+room : '';
+  cleanups.push(DB.on(RANK, v => { const el = $('#ranklist'); if (el) el.innerHTML = rankHTML(rankList(v), null); }));
+}
+
 function route(){
   reset();
   const h = new URLSearchParams(location.hash.slice(1));
+  if (h.get('k') !== null) return rankView(h.get('r'));
   if (h.get('r')) return roomView(h.get('r'));
   homeView();
 }
@@ -368,6 +400,7 @@ function homeView(){
     <button class="btn" id="make">방 만들기</button>
     <label class="f">가족이 만든 방에 들어가기</label>
     <div class="row"><input id="rcode" class="code-in" inputmode="numeric" maxlength="4" placeholder="0000"><button class="btn ghost small" id="join" style="flex:none;padding:16px 18px">입장</button></div>
+    <div style="height:12px"></div><button class="btn ghost" id="rank">🏆 최고 기록 랭킹</button>
   </div>
   <div class="card"><h2>이렇게 해요</h2><div class="rules">
     <div>① 주제가 나오면 <b>12초</b> 안에 맞는 낱말을 한글로 적어요.</div>
@@ -381,6 +414,7 @@ function homeView(){
   document.querySelectorAll('.colors button').forEach(b => b.onclick = () => {
     ME.color = b.dataset.c; saveMe(); document.querySelectorAll('.colors button').forEach(x => x.classList.toggle('on', x===b)); });
   $('#rcode').oninput = e => e.target.value = e.target.value.replace(/\D/g,'').slice(0,4);
+  $('#rank').onclick = () => location.hash = 'k=1';
   $('#make').onclick = async () => {
     if (!ME.name) return err('이름을 먼저 적어 주세요.');
     $('#make').disabled = true;
@@ -730,9 +764,27 @@ function roomView(code){
         ${recap.map(({t,res}) => `<tr><td class="tp">${esc(t)}</td>${rs.map(p => { const r = res[p.pid]||{};
           return `<td class="${r.pts?'':'x'}">${esc(r.word||'—')}${r.pts?` <small>+${r.pts}</small>`:''}</td>`; }).join('')}</tr>`).join('')}
         </table></div>
+      <div id="newrec"></div>
+      <div class="card"><h2>🏆 최고 기록 10</h2><div class="plist" id="ranklist"><p class="sub">불러오는 중…</p></div></div>
       <div style="height:14px"></div>
       <button class="btn" id="again">한 판 더! (새 주제)</button>
       <p class="sub" style="text-align:center;margin-top:10px">아무나 누르면 모두 대기실로 가요</p>`);
+    // 내 기록 저장 (한 판에 한 번만)
+    const me = rank.find(p => p.pid === ME.pid);
+    const rkey = code+'-'+(d.game||0);
+    if (me && me.n > 0 && R.rankSaved !== rkey) {
+      R.rankSaved = rkey;
+      DB.set(RANK+'/'+rkey+'-'+ME.pid, { name:ME.name, color:ME.color, score:me.n, at:now(), pid:ME.pid }).catch(e => window.__showErr && __showErr('기록 저장 실패: '+e.message));
+    }
+    if (R.rankOff) R.rankOff();
+    R.rankOff = DB.on(RANK, v => {
+      const list = rankList(v), el = $('#ranklist'), nr = $('#newrec');
+      if (!el || !nr) return;
+      el.innerHTML = rankHTML(list, rkey+'-'+ME.pid);
+      const i = list.findIndex(r => r.id === rkey+'-'+ME.pid);
+      nr.innerHTML = i >= 0 ? `<div class="newrec">🏆 ${esc(ME.name)} ${i+1}위 기록! (${me.n}층)</div>` : '';
+    });
+    cleanups.push(() => { if (R.rankOff) R.rankOff(); R.rankOff = null; });
     $('#again').onclick = () => DB.update(path, { state:'lobby' });
     $('#out').onclick = leave;
   }
