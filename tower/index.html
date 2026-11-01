@@ -43,6 +43,7 @@ label.f{display:block;font-size:13px;font-weight:700;color:var(--sub);margin:14p
 input{width:100%;font:inherit;font-size:17px;border:1.5px solid var(--line);border-radius:14px;padding:13px 14px;background:#fff;color:var(--text);outline:none;-webkit-user-select:text;user-select:text}
 input:focus{border-color:var(--brand)}
 .code-in{font-size:28px;font-weight:800;text-align:center;letter-spacing:.3em}
+.lead{display:flex;align-items:center;gap:10px;min-width:0}.home{font-size:12px;font-weight:700;color:#6b7a83;border:1.5px solid #e9eef0;border-radius:999px;padding:4px 10px;text-decoration:none;white-space:nowrap;line-height:1.2}.home:active{background:#f3f5f7}
 .top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
 .brand{display:flex;align-items:center;gap:7px;font-family:Jua,Pretendard,sans-serif;font-size:20px}
 .brand svg{width:30px;height:30px}
@@ -338,7 +339,9 @@ function paint(html){
     : DB.demo ? `<div class="demo">체험 모드 · 이 브라우저 안에서만 작동해요.</div>` : '';
   app.innerHTML = banner + html;
 }
-const header = (right='') => `<div class="top"><div class="brand">${ICON}뚝딱 단어탑</div>${right}</div>`;
+const FROM_HOME = new URLSearchParams(location.search).get('from')==='home';
+const HOME = FROM_HOME ? `<a class="home" href="https://hue1220.github.io/">← 홈</a>` : '';
+const header = (right='') => `<div class="top"><div class="lead"><div class="brand">${ICON}뚝딱 단어탑</div>${HOME}</div>${right}</div>`;
 let cleanups = [];
 function reset(){ cleanups.forEach(f=>{ try{f();}catch(e){} }); cleanups=[]; overlay(null); }
 function overlay(big, small=''){ const o=$('#overlay'); if (!big) return o.classList.add('hide'); $('#ovt').textContent=big; $('#ovs').textContent=small; o.classList.remove('hide'); }
